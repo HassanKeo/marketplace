@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Administration - Marketplace</title>
+    <!-- Tailwind CSS pour un design propre et rapide -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- SDK Supabase -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-gray-50 min-h-screen font-sans">
+
+    <!-- En-tête Admin -->
+    <header class="bg-white shadow-sm border-b">
+        <div class="max-w-4xl mx-auto px-4 py-4 flex justify-between items-center">
+            <h1 class="text-xl font-bold text-gray-800">Tableau de Bord Vendeur</h1>
+            <div id="auth-status" class="text-sm text-gray-500">Non connecté</div>
+        </div>
+    </header>
+
+    <main class="max-w-4xl mx-auto px-4 py-6">
+        
+        <!-- SECTION 1 : CONNEXION / INSCRIPTION -->
+        <section id="auth-section" class="bg-white p-6 rounded-xl shadow-sm border max-w-md mx-auto">
+            <h2 id="auth-title" class="text-lg font-semibold mb-4">Connexion Vendeur</h2>
+            
+            <form id="auth-form" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Identifiant / ID de boutique</label>
+                    <input type="text" id="shop-id" required class="w-only w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="ex: ma-boutique">
+                </div>
+                <div id="signup-fields" class="hidden space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Nom de la boutique</label>
+                        <input type="text" id="shop-name" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Ma Super Boutique">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Numéro WhatsApp (avec indicatif)</label>
+                        <input type="text" id="shop-phone" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="+22500000000">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Mot de passe</label>
+                    <input type="password" id="shop-password" required class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="••••••••">
+                </div>
+
+                <button type="submit" id="auth-btn" class="w-full bg-blue-600 text-white py-2 rounded-lg font-medium hover:bg-blue-700 transition">Se connecter</button>
+            </form>
+
+            <p class="text-center text-sm text-gray-600 mt-4">
+                <span id="auth-switch-text">Pas encore de compte ?</span> 
+                <button type="button" id="toggle-mode" class="text-blue-600 font-medium hover:underline ml-1">S'inscrire</button>
+            </p>
+        </section>
+
+        <!-- SECTION 2 : TABLEAU DE BORD (Caché par défaut) -->
+        <section id="dashboard-section" class="hidden space-y-6">
+            <div class="bg-white p-6 rounded-xl shadow-sm border flex justify-between items-center">
+                <div>
+                    <h2 id="welcome-shop" class="text-xl font-bold text-gray-800">Bienvenue</h2>
+                    <p class="text-sm text-gray-500">Gère tes produits et suis tes commandes ici.</p>
+                </div>
+                <button id="logout-btn" class="bg-red-50 text-red-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-100 transition">Déconnexion</button>
+            </div>
+
+            <!-- Formulaire d'ajout de produit -->
+            <div class="bg-white p-6 rounded-xl shadow-sm border">
+                <h3 class="text-lg font-semibold mb-4">Ajouter un produit</h3>
+                <form id="product-form" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Nom du produit</label>
+                        <input type="text" id="prod-name" required class="w-full px-3 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Prix (FCFA)</label>
+                        <input type="number" id="prod-price" required class="w-full px-3 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                        <textarea id="prod-desc" rows="2" class="w-full px-3 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Image du produit</label>
+                        <input type="file" id="prod-image" accept="image/*" required class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                    </div>
+                    <div class="md:col-span-2">
+                        <button type="submit" id="save-prod-btn" class="w-full bg-green-600 text-white py-2 rounded-lg font-medium hover:bg-green-700 transition">Ajouter au catalogue</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Liste des produits et commandes -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="bg-white p-6 rounded-xl shadow-sm border">
+                    <h3 class="text-lg font-semibold mb-4">Mes Produits</h3>
+                    <div id="products-list" class="space-y-3 text-sm text-gray-600">Chargement...</div>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-sm border">
+                    <h3 class="text-lg font-semibold mb-4">Commandes reçues</h3>
+                    <div id="orders-list" class="space-y-3 text-sm text-gray-600">Chargement...</div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Scripts du projet -->
+    <script src="js/config.js"></script>
+    <script src="js/compress.js"></script>
+    <script src="js/admin.js"></script>
+</body>
+</html>
