@@ -1,218 +1,221 @@
+// js/admin.js
+
 document.addEventListener("DOMContentLoaded", () => {
-    const authForm = document.getElementById("auth-form");
-    const shopIdInput = document.getElementById("shop-id");
-    const shopPasswordInput = document.getElementById("shop-password");
-    const shopNameInput = document.getElementById("shop-name");
-    const shopPhoneInput = document.getElementById("shop-phone");
-    const signupFields = document.getElementById("signup-fields");
+    const authContainer = document.getElementById("auth-container");
+    const dashboardContainer = document.getElementById("dashboard-container");
     const authTitle = document.getElementById("auth-title");
-    const authBtn = document.getElementById("auth-btn");
-    const authSwitchText = document.getElementById("auth-switch-text");
-    const toggleModeBtn = document.getElementById("toggle-mode");
-    const authSection = document.getElementById("auth-section");
-    const dashboardSection = document.getElementById("dashboard-section");
-    const authStatus = document.getElementById("auth-status");
-    const logoutBtn = document.getElementById("logout-btn");
-    const welcomeShop = document.getElementById("welcome-shop");
-    const productForm = document.getElementById("product-form");
-    const productsList = document.getElementById("products-list");
-    const ordersList = document.getElementById("orders-list");
+    const authForm = document.getElementById("auth-form");
+    const submitBtn = document.getElementById("submit-btn");
+    const toggleAuth = document.getElementById("toggle-auth");
+    
+    const signupFields = document.getElementById("signup-fields");
+    const shopNameInput = document.getElementById("shop_name");
+    const whatsappInput = document.getElementById("whatsapp");
+    const shopIdInput = document.getElementById("shop_id");
+    const passwordInput = document.getElementById("password");
 
-    let isSignup = false;
-    let currentVendor = JSON.parse(localStorage.getItem("currentVendor")) || null;
+    let isLoginMode = true;
 
-    // Vérifier si un vendeur est déjà connecté en mémoire
-    if (currentVendor) {
-        showDashboard(currentVendor);
+    // Ajout d'un texte d'aide explicite sous les champs
+    if (whatsappInput) {
+        whatsappInput.setAttribute("placeholder", "+2250502554883");
+        let helpText = whatsappInput.parentNode.querySelector(".help-text-wa");
+        if (!helpText) {
+            helpText = document.createElement("p");
+            helpText.className = "help-text-wa text-gray-500 text-xs mt-1";
+            helpText.textContent = "Précise obligatoirement l'indicatif de ton pays (ex: +225...).";
+            whatsappInput.parentNode.appendChild(helpText);
+        }
+    }
+
+    if (shopIdInput) {
+        let helpTextId = shopIdInput.parentNode.querySelector(".help-text-id");
+        if (!helpTextId) {
+            helpTextId = document.createElement("p");
+            helpTextId.className = "help-text-id text-gray-500 text-xs mt-1";
+            helpTextId.textContent = "Minuscules, chiffres et tirets uniquement, sans espaces.";
+            shopIdInput.parentNode.appendChild(helpTextId);
+        }
     }
 
     // Basculer entre Connexion et Inscription
-    toggleModeBtn.addEventListener("click", () => {
-        isSignup = !isSignup;
-        if (isSignup) {
-            authTitle.textContent = "Inscription Vendeur";
-            authBtn.textContent = "S'inscrire";
-            signupFields.classList.remove("hidden");
-            authSwitchText.textContent = "Déjà un compte ?";
-            toggleModeBtn.textContent = "Se connecter";
-            shopNameInput.required = true;
-            shopPhoneInput.required = true;
-        } else {
-            authTitle.textContent = "Connexion Vendeur";
-            authBtn.textContent = "Se connecter";
-            signupFields.classList.add("hidden");
-            authSwitchText.textContent = "Pas encore de compte ?";
-            toggleModeBtn.textContent = "S'inscrire";
-            shopNameInput.required = false;
-            shopPhoneInput.required = false;
-        }
-    });
+    if (toggleAuth) {
+        toggleAuth.addEventListener("click", (e) => {
+            e.preventDefault();
+            clearFeedback();
+            isLoginMode = !isLoginMode;
 
-    // Gestion de la soumission du formulaire d'authentification
-    authForm.addEventListener("submit", async (e) => {
-        e.preventDefault();
-        const id = shopIdInput.value.trim().toLowerCase();
-        const password = shopPasswordInput.value.trim();
+            if (isLoginMode) {
+                authTitle.textContent = "Connexion Vendeur";
+                submitBtn.textContent = "Se connecter";
+                signupFields.classList.add("hidden");
+                toggleAuth.innerHTML = 'Pas encore de compte ? <span class="text-blue-600 underline">S\'inscrire</span>';
+            } else {
+                authTitle.textContent = "Inscription Vendeur";
+                submitBtn.textContent = "S'inscrire";
+                signupFields.classList.remove("hidden");
+                toggleAuth.innerHTML = 'Déjà un compte ? <span class="text-blue-600 underline">Se connecter</span>';
+            }
+        });
+    }
 
-        if (isSignup) {
-            const nom_boutique = shopNameInput.value.trim();
-            const telephone_whatsapp = shopPhoneInput.value.trim();
+    // Gestion de la soumission du formulaire
+    if (authForm) {
+        authForm.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            clearFeedback();
 
-            const { error } = await db.from("vendeurs").insert([{
-                id,
-                nom_boutique,
-                telephone_whatsapp,
-                mot_de_passe: password
-            }]);
+            const shopId = shopIdInput.value.trim();
+            const password = passwordInput.value.trim();
 
-            if (error) {
-                alert("Erreur lors de l'inscription : " + error.message);
+            if (!shopId) {
+                showError(shopIdInput, "L'identifiant de la boutique est obligatoire.");
                 return;
             }
 
-            alert("Compte créé avec succès ! Connecte-toi.");
-            toggleModeBtn.click();
-        } else {
-            const { data, error } = await db
-                .from("vendeurs")
-                .select("*")
-                .eq("id", id)
-                .single();
-
-            if (error || !data || data.mot_de_passe !== password) {
-                alert("Identifiant ou mot de passe incorrect.");
+            // Vérification stricte du format de l'ID (pas d'espaces, pas de majuscules, pas de caractères spéciaux non autorisés)
+            if (!/^[a-z0-9_-]+$/.test(shopId)) {
+                showError(shopIdInput, "L'identifiant ne doit contenir que des minuscules, chiffres, tirets ou underscores (pas d'espaces ni de majuscules).");
                 return;
             }
 
-            currentVendor = data;
-            localStorage.setItem("currentVendor", JSON.stringify(currentVendor));
-            showDashboard(currentVendor);
-        }
-    });
+            if (password.length < 6) {
+                showError(passwordInput, "Le mot de passe doit contenir au moins 6 caractères.");
+                return;
+            }
 
-    // Déconnexion
-    logoutBtn.addEventListener("click", () => {
-        localStorage.removeItem("currentVendor");
-        currentVendor = null;
-        dashboardSection.classList.add("hidden");
-        authSection.classList.remove("hidden");
-        authStatus.textContent = "Non connecté";
-        authForm.reset();
-    });
+            if (isLoginMode) {
+                await handleLogin(shopId, password);
+            } else {
+                const shopName = shopNameInput.value.trim();
+                const whatsapp = whatsappInput.value.trim().replace(/\s+/g, "");
 
-    function showDashboard(vendor) {
-        authSection.classList.add("hidden");
-        dashboardSection.classList.remove("hidden");
-        authStatus.textContent = `Connecté : ${vendor.nom_boutique}`;
-        welcomeShop.textContent = `Boutique : ${vendor.nom_boutique}`;
-        loadVendorData(vendor.id);
+                if (!shopName) {
+                    showError(shopNameInput, "Le nom de la boutique est obligatoire.");
+                    return;
+                }
+
+                // Vérification stricte de l'indicatif international
+                if (!whatsapp.startsWith("+")) {
+                    showError(whatsappInput, "Tu dois obligatoirement inclure l'indicatif de ton pays au début (ex: +225...).");
+                    return;
+                }
+
+                if (!/^\+[1-9][0-9]{7,14}$/.test(whatsapp)) {
+                    showError(whatsappInput, "Format WhatsApp invalide. Respecte le format international (ex: +2250502554883).");
+                    return;
+                }
+
+                await handleSignup(shopId, shopName, whatsapp, password);
+            }
+        });
     }
 
-    // Charger les produits et commandes du vendeur
-    async function loadVendorData(vendorId) {
-        // Chargement des produits
-        const { data: products, error: prodError } = await db
-            .from("produits")
-            .select("*")
-            .eq("vendor_id", vendorId)
-            .order("cree_le", { ascending: false });
-
-        if (!prodError) {
-            if (products.length === 0) {
-                productsList.innerHTML = `<p class="text-gray-400">Aucun produit pour le moment.</p>`;
-            } else {
-                productsList.innerHTML = products.map(p => `
-                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
-                        <div class="flex items-center space-x-3">
-                            <img src="${p.image_url}" alt="${p.nom}" class="w-12 h-12 object-cover rounded">
-                            <div>
-                                <p class="font-semibold text-gray-800">${p.nom}</p>
-                                <p class="text-xs text-gray-500">${p.prix} FCFA - <span class="${p.statut === 'disponible' ? 'text-green-600' : 'text-red-500'}">${p.statut}</span></p>
-                            </div>
-                        </div>
-                        <button onclick="toggleProductStatus('${p.id}', '${p.statut}')" class="text-xs px-2 py-1 bg-white border rounded hover:bg-gray-100">
-                            Changer statut
-                        </button>
-                    </div>
-                `).join("");
-            }
-        }
-
-        // Chargement des commandes
-        const { data: orders, error: ordError } = await db
-            .from("commandes")
-            .select("*, produits(nom)")
-            .eq("vendor_id", vendorId)
-            .order("cree_le", { ascending: false });
-
-        if (!ordError) {
-            if (orders.length === 0) {
-                ordersList.innerHTML = `<p class="text-gray-400">Aucune commande reçue.</p>`;
-            } else {
-                ordersList.innerHTML = orders.map(o => `
-                    <div class="p-3 bg-gray-50 rounded-lg border space-y-1">
-                        <div class="flex justify-between font-semibold text-gray-800">
-                            <span>Produit : ${o.produits ? o.produits.nom : 'Inconnu'}</span>
-                            <span class="text-blue-600">Qté: ${o.quantite}</span>
-                        </div>
-                        <p class="text-xs text-gray-600">Client : <a href="https://wa.me/${o.telephone_client}" target="_blank" class="text-green-600 underline font-medium">${o.telephone_client}</a></p>
-                        <p class="text-xs text-gray-500">Lieu : ${o.lieu_livraison}</p>
-                    </div>
-                `).join("");
-            }
-        }
-    }
-
-    // Ajout d'un produit
-    productForm.addEventListener("submit", async (e) => {
-        e.preventDefault();
-        const submitBtn = document.getElementById("save-prod-btn");
-        submitBtn.textContent = "Compression et upload en cours...";
-        submitBtn.disabled = true;
-
-        const nom = document.getElementById("prod-name").value;
-        const prix = parseInt(document.getElementById("prod-price").value);
-        const description = document.getElementById("prod-desc").value;
-        const imageFile = document.getElementById("prod-image").files[0];
-
+    async function handleSignup(shopId, shopName, whatsapp, password) {
+        setLoading(true);
         try {
-            // Utilisation de la fonction d'upload compressée (compress.js)
-            const imageUrl = await compressAndUploadImage(imageFile);
+            const { data: existingVendor } = await db
+                .from("vendeurs")
+                .select("id")
+                .eq("id", shopId)
+                .maybeSingle();
 
-            const { error } = await db.from("produits").insert([{
-                vendor_id: currentVendor.id,
-                nom,
-                prix,
-                description,
-                image_url: imageUrl,
-                statut: "disponible"
-            }]);
+            if (existingVendor) {
+                showError(shopIdInput, "Cet identifiant est déjà pris. Choisis-en un autre.");
+                setLoading(false);
+                return;
+            }
+
+            const { error } = await db.from("vendeurs").insert([
+                { id: shopId, nom_boutique: shopName, whatsapp: whatsapp, password: password }
+            ]);
 
             if (error) throw error;
 
-            alert("Produit ajouté avec succès !");
-            productForm.reset();
-            loadVendorData(currentVendor.id);
+            localStorage.setItem("vendor_session", JSON.stringify({ shopId, shopName, whatsapp }));
+            showDashboard();
         } catch (err) {
-            alert("Erreur lors de l'ajout : " + err.message);
+            showGlobalError("Erreur lors de l'inscription : " + (err.message || "Problème réseau."));
         } finally {
-            submitBtn.textContent = "Ajouter au catalogue";
-            submitBtn.disabled = false;
+            setLoading(false);
         }
-    });
+    }
 
-    // Fonction globale pour changer le statut d'un produit
-    window.toggleProductStatus = async function(productId, currentStatus) {
-        const newStatus = currentStatus === "disponible" ? "epuise" : "disponible";
-        const { error } = await db
-            .from("produits")
-            .update({ statut: newStatus })
-            .eq("id", productId);
+    async function handleLogin(shopId, password) {
+        setLoading(true);
+        try {
+            const { data, error } = await db
+                .from("vendeurs")
+                .select("*")
+                .eq("id", shopId)
+                .eq("password", password)
+                .maybeSingle();
 
-        if (!error) {
-            loadVendorData(currentVendor.id);
-        } else {
-            alert("Erreur lors de la mise à jour.");
+            if (error || !data) {
+                showGlobalError("Identifiant ou mot de passe incorrect.");
+                setLoading(false);
+                return;
+            }
+
+            localStorage.setItem("vendor_session", JSON.stringify({
+                shopId: data.id,
+                shopName: data.nom_boutique,
+                whatsapp: data.whatsapp
+            }));
+
+            showDashboard();
+        } catch (err) {
+            showGlobalError("Erreur de connexion : " + (err.message || "Vérifiez vos identifiants."));
+        } finally {
+            setLoading(false);
         }
-    };
+    }
+
+    function showError(inputElement, message) {
+        inputElement.classList.add("border-red-500", "bg-red-50");
+        let errorMsg = inputElement.parentNode.querySelector(".error-text");
+        if (!errorMsg) {
+            errorMsg = document.createElement("p");
+            errorMsg.className = "error-text text-red-600 text-xs mt-1 font-medium";
+            inputElement.parentNode.appendChild(errorMsg);
+        }
+        errorMsg.textContent = message;
+        inputElement.focus();
+    }
+
+    function showGlobalError(message) {
+        let globalBox = document.getElementById("auth-global-error");
+        if (!globalBox) {
+            globalBox = document.createElement("div");
+            globalBox.id = "auth-global-error";
+            globalBox.className = "mb-4 p-3 bg-red-100 border border-red-400 text-red-700 text-sm rounded";
+            authForm.prepend(globalBox);
+        }
+        globalBox.textContent = message;
+    }
+
+    function clearFeedback() {
+        document.querySelectorAll(".error-text").forEach(el => el.remove());
+        document.querySelectorAll("input").forEach(el => el.classList.remove("border-red-500", "bg-red-50"));
+        const globalBox = document.getElementById("auth-global-error");
+        if (globalBox) globalBox.remove();
+    }
+
+    function setLoading(isLoading) {
+        if (submitBtn) {
+            submitBtn.disabled = isLoading;
+            submitBtn.textContent = isLoading ? "Traitement en cours..." : (isLoginMode ? "Se connecter" : "S'inscrire");
+        }
+    }
+
+    function showDashboard() {
+        if (authContainer) authContainer.classList.add("hidden");
+        if (dashboardContainer) dashboardContainer.classList.remove("hidden");
+        if (window.loadVendorProducts) window.loadVendorProducts();
+    }
+
+    const session = localStorage.getItem("vendor_session");
+    if (session) {
+        showDashboard();
+    }
 });
