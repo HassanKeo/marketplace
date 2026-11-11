@@ -16,29 +16,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     let isLoginMode = true;
 
-    // Ajout d'un texte d'aide explicite sous les champs
-    if (whatsappInput) {
-        whatsappInput.setAttribute("placeholder", "+2250502554883");
-        let helpText = whatsappInput.parentNode.querySelector(".help-text-wa");
-        if (!helpText) {
-            helpText = document.createElement("p");
-            helpText.className = "help-text-wa text-gray-500 text-xs mt-1";
-            helpText.textContent = "Précise obligatoirement l'indicatif de ton pays (ex: +225...).";
-            whatsappInput.parentNode.appendChild(helpText);
-        }
-    }
-
-    if (shopIdInput) {
-        let helpTextId = shopIdInput.parentNode.querySelector(".help-text-id");
-        if (!helpTextId) {
-            helpTextId = document.createElement("p");
-            helpTextId.className = "help-text-id text-gray-500 text-xs mt-1";
-            helpTextId.textContent = "Minuscules, chiffres et tirets uniquement, sans espaces.";
-            shopIdInput.parentNode.appendChild(helpTextId);
-        }
-    }
-
-    // Basculer entre Connexion et Inscription
+    // Basculer proprement entre Connexion et Inscription
     if (toggleAuth) {
         toggleAuth.addEventListener("click", (e) => {
             e.preventDefault();
@@ -48,13 +26,13 @@ document.addEventListener("DOMContentLoaded", () => {
             if (isLoginMode) {
                 authTitle.textContent = "Connexion Vendeur";
                 submitBtn.textContent = "Se connecter";
-                signupFields.classList.add("hidden");
-                toggleAuth.innerHTML = 'Pas encore de compte ? <span class="text-blue-600 underline">S\'inscrire</span>';
+                if (signupFields) signupFields.classList.add("hidden");
+                toggleAuth.textContent = "Pas encore de compte ? S'inscrire";
             } else {
                 authTitle.textContent = "Inscription Vendeur";
                 submitBtn.textContent = "S'inscrire";
-                signupFields.classList.remove("hidden");
-                toggleAuth.innerHTML = 'Déjà un compte ? <span class="text-blue-600 underline">Se connecter</span>';
+                if (signupFields) signupFields.classList.remove("hidden");
+                toggleAuth.textContent = "Déjà un compte ? Se connecter";
             }
         });
     }
@@ -65,17 +43,16 @@ document.addEventListener("DOMContentLoaded", () => {
             e.preventDefault();
             clearFeedback();
 
-            const shopId = shopIdInput.value.trim();
-            const password = passwordInput.value.trim();
+            const shopId = shopIdInput ? shopIdInput.value.trim() : "";
+            const password = passwordInput ? passwordInput.value.trim() : "";
 
             if (!shopId) {
                 showError(shopIdInput, "L'identifiant de la boutique est obligatoire.");
                 return;
             }
 
-            // Vérification stricte du format de l'ID (pas d'espaces, pas de majuscules, pas de caractères spéciaux non autorisés)
             if (!/^[a-z0-9_-]+$/.test(shopId)) {
-                showError(shopIdInput, "L'identifiant ne doit contenir que des minuscules, chiffres, tirets ou underscores (pas d'espaces ni de majuscules).");
+                showError(shopIdInput, "L'identifiant doit être en minuscules sans espaces (ex: ma-boutique).");
                 return;
             }
 
@@ -87,22 +64,21 @@ document.addEventListener("DOMContentLoaded", () => {
             if (isLoginMode) {
                 await handleLogin(shopId, password);
             } else {
-                const shopName = shopNameInput.value.trim();
-                const whatsapp = whatsappInput.value.trim().replace(/\s+/g, "");
+                const shopName = shopNameInput ? shopNameInput.value.trim() : "";
+                const whatsapp = whatsappInput ? whatsappInput.value.trim().replace(/\s+/g, "") : "";
 
                 if (!shopName) {
                     showError(shopNameInput, "Le nom de la boutique est obligatoire.");
                     return;
                 }
 
-                // Vérification stricte de l'indicatif international
                 if (!whatsapp.startsWith("+")) {
-                    showError(whatsappInput, "Tu dois obligatoirement inclure l'indicatif de ton pays au début (ex: +225...).");
+                    showError(whatsappInput, "Indique obligatoirement l'indicatif de ton pays (ex: +225...).");
                     return;
                 }
 
                 if (!/^\+[1-9][0-9]{7,14}$/.test(whatsapp)) {
-                    showError(whatsappInput, "Format WhatsApp invalide. Respecte le format international (ex: +2250502554883).");
+                    showError(whatsappInput, "Format international invalide (ex: +2250502554883).");
                     return;
                 }
 
@@ -121,7 +97,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 .maybeSingle();
 
             if (existingVendor) {
-                showError(shopIdInput, "Cet identifiant est déjà pris. Choisis-en un autre.");
+                showError(shopIdInput, "Cet identifiant est déjà pris.");
                 setLoading(false);
                 return;
             }
@@ -135,7 +111,7 @@ document.addEventListener("DOMContentLoaded", () => {
             localStorage.setItem("vendor_session", JSON.stringify({ shopId, shopName, whatsapp }));
             showDashboard();
         } catch (err) {
-            showGlobalError("Erreur lors de l'inscription : " + (err.message || "Problème réseau."));
+            showGlobalError("Erreur d'inscription : " + (err.message || "Problème serveur."));
         } finally {
             setLoading(false);
         }
@@ -165,13 +141,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
             showDashboard();
         } catch (err) {
-            showGlobalError("Erreur de connexion : " + (err.message || "Vérifiez vos identifiants."));
+            showGlobalError("Erreur de connexion : " + (err.message || "Identifiants invalides."));
         } finally {
             setLoading(false);
         }
     }
 
     function showError(inputElement, message) {
+        if (!inputElement) return;
         inputElement.classList.add("border-red-500", "bg-red-50");
         let errorMsg = inputElement.parentNode.querySelector(".error-text");
         if (!errorMsg) {
@@ -185,13 +162,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function showGlobalError(message) {
         let globalBox = document.getElementById("auth-global-error");
-        if (!globalBox) {
+        if (!globalBox && authForm) {
             globalBox = document.createElement("div");
             globalBox.id = "auth-global-error";
             globalBox.className = "mb-4 p-3 bg-red-100 border border-red-400 text-red-700 text-sm rounded";
             authForm.prepend(globalBox);
         }
-        globalBox.textContent = message;
+        if (globalBox) globalBox.textContent = message;
     }
 
     function clearFeedback() {
@@ -204,7 +181,7 @@ document.addEventListener("DOMContentLoaded", () => {
     function setLoading(isLoading) {
         if (submitBtn) {
             submitBtn.disabled = isLoading;
-            submitBtn.textContent = isLoading ? "Traitement en cours..." : (isLoginMode ? "Se connecter" : "S'inscrire");
+            submitBtn.textContent = isLoading ? "Traitement..." : (isLoginMode ? "Se connecter" : "S'inscrire");
         }
     }
 
