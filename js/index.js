@@ -1,3 +1,35 @@
+// Dans index.js au chargement de la page
+document.addEventListener("DOMContentLoaded", async () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const vendorId = urlParams.get("v"); // Récupère la valeur de ?v=...
+
+    if (vendorId) {
+        // Mode boutique spécifique : charger uniquement les produits de ce vendeur
+        await loadProductsByVendor(vendorId);
+        
+        // Optionnel : afficher le nom de la boutique dans un en-tête (ex: "Boutique de [Nom]")
+        displayVendorHeader(vendorId);
+    } else {
+        // Mode marketplace globale : charger tous les produits de tous les vendeurs
+        loadAllProducts();
+    }
+});
+
+// Fonction pour filtrer les produits Supabase par vendeur
+async function loadProductsByVendor(shopId) {
+    try {
+        const { data: products, error } = await db
+            .from("produits")
+            .select("*")
+            .eq("vendeur_id", shopId); // Assure-toi que ta table produits a bien une colonne 'vendeur_id'
+
+        if (error) throw error;
+        renderProducts(products);
+    } catch (err) {
+        console.error("Erreur chargement produits de la boutique :", err.message);
+    }
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
     const catalogGrid = document.getElementById("catalog-grid");
     const searchInput = document.getElementById("search-input");
