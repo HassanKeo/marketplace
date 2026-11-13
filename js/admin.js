@@ -16,7 +16,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     let isLoginMode = true;
 
-    // Gestion propre du basculement Connexion / Inscription
+    // Basculement propre Connexion / Inscription
     if (toggleAuth) {
         toggleAuth.addEventListener("click", (e) => {
             e.preventDefault();
@@ -27,17 +27,17 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (authTitle) authTitle.textContent = "Connexion Vendeur";
                 if (submitBtn) submitBtn.textContent = "Se connecter";
                 if (signupFields) signupFields.classList.add("hidden");
-                toggleAuth.innerHTML = 'Pas encore de compte ? <span class="text-blue-600 underline">S\'inscrire</span>';
+                toggleAuth.textContent = "Pas encore de compte ? S'inscrire";
             } else {
                 if (authTitle) authTitle.textContent = "Inscription Vendeur";
                 if (submitBtn) submitBtn.textContent = "S'inscrire";
                 if (signupFields) signupFields.classList.remove("hidden");
-                toggleAuth.innerHTML = 'Déjà un compte ? <span class="text-blue-600 underline">Se connecter</span>';
+                toggleAuth.textContent = "Déjà un compte ? Se connecter";
             }
         });
     }
 
-    // Soumission unique du formulaire avec validations strictes et guidage visuel
+    // Gestion de la soumission du formulaire
     if (authForm) {
         authForm.addEventListener("submit", async (e) => {
             e.preventDefault();
@@ -46,17 +46,16 @@ document.addEventListener("DOMContentLoaded", () => {
             const shopId = shopIdInput ? shopIdInput.value.trim() : "";
             const password = passwordInput ? passwordInput.value.trim() : "";
 
-            // Validation de l'identifiant
             if (!shopId) {
                 showError(shopIdInput, "L'identifiant de la boutique est obligatoire.");
                 return;
             }
+
             if (!/^[a-z0-9_-]+$/.test(shopId)) {
                 showError(shopIdInput, "L'identifiant doit être en minuscules, sans espaces ni accents (ex: ma-boutique).");
                 return;
             }
 
-            // Validation du mot de passe
             if (password.length < 6) {
                 showError(passwordInput, "Le mot de passe doit contenir au moins 6 caractères.");
                 return;
@@ -68,21 +67,21 @@ document.addEventListener("DOMContentLoaded", () => {
                 const shopName = shopNameInput ? shopNameInput.value.trim() : "";
                 const whatsapp = whatsappInput ? whatsappInput.value.trim().replace(/\s+/g, "") : "";
 
-                // Validation du nom de la boutique
                 if (!shopName) {
                     showError(shopNameInput, "Le nom de la boutique est obligatoire.");
                     return;
                 }
 
-                // Validation stricte du numéro WhatsApp avec indicatif international obligatoire
                 if (!whatsapp) {
                     showError(whatsappInput, "Le numéro WhatsApp est obligatoire.");
                     return;
                 }
+
                 if (!whatsapp.startsWith("+")) {
                     showError(whatsappInput, "Précise obligatoirement l'indicatif de ton pays au début (ex: +225...).");
                     return;
                 }
+
                 if (!/^\+[1-9][0-9]{7,14}$/.test(whatsapp)) {
                     showError(whatsappInput, "Format international invalide (ex: +2250502554883).");
                     return;
@@ -93,11 +92,9 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // Logique d'inscription
     async function handleSignup(shopId, shopName, whatsapp, password) {
         setLoading(true);
         try {
-            // Vérifier si l'identifiant existe déjà dans la base
             const { data: existingVendor, error: checkError } = await db
                 .from("vendeurs")
                 .select("id")
@@ -107,29 +104,26 @@ document.addEventListener("DOMContentLoaded", () => {
             if (checkError) throw checkError;
 
             if (existingVendor) {
-                showError(shopIdInput, "Cet identifiant de boutique est déjà pris. Choisis-en un autre.");
+                showError(shopIdInput, "Cet identifiant de boutique est déjà pris.");
                 setLoading(false);
                 return;
             }
 
-            // Insertion du nouveau vendeur
             const { error: insertError } = await db.from("vendeurs").insert([
                 { id: shopId, nom_boutique: shopName, whatsapp: whatsapp, password: password }
             ]);
 
             if (insertError) throw insertError;
 
-            // Enregistrement de la session et redirection vers le tableau de bord
             localStorage.setItem("vendor_session", JSON.stringify({ shopId, shopName, whatsapp }));
             showDashboard();
         } catch (err) {
-            showGlobalError("Erreur lors de l'inscription : " + (err.message || "Problème de communication avec la base de données."));
+            showGlobalError("Erreur lors de l'inscription : " + (err.message || "Problème réseau."));
         } finally {
             setLoading(false);
         }
     }
 
-    // Logique de connexion
     async function handleLogin(shopId, password) {
         setLoading(true);
         try {
@@ -156,13 +150,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
             showDashboard();
         } catch (err) {
-            showGlobalError("Erreur de connexion : " + (err.message || "Problème de communication avec la base de données."));
+            showGlobalError("Erreur de connexion : " + (err.message || "Problème réseau."));
         } finally {
             setLoading(false);
         }
     }
 
-    // Affichage des erreurs ciblées sous le champ concerné (guidage visuel)
     function showError(inputElement, message) {
         if (!inputElement) return;
         inputElement.classList.add("border-red-500", "bg-red-50");
@@ -176,7 +169,6 @@ document.addEventListener("DOMContentLoaded", () => {
         inputElement.focus();
     }
 
-    // Affichage des erreurs globales (identifiants incorrects, pannes réseau)
     function showGlobalError(message) {
         let globalBox = document.getElementById("auth-global-error");
         if (!globalBox && authForm) {
@@ -188,7 +180,6 @@ document.addEventListener("DOMContentLoaded", () => {
         if (globalBox) globalBox.textContent = message;
     }
 
-    // Nettoyage complet des retours visuels d'erreur
     function clearFeedback() {
         document.querySelectorAll(".error-text").forEach(el => el.remove());
         document.querySelectorAll("input").forEach(el => el.classList.remove("border-red-500", "bg-red-50"));
@@ -196,15 +187,13 @@ document.addEventListener("DOMContentLoaded", () => {
         if (globalBox) globalBox.remove();
     }
 
-    // Gestion dynamique de l'état de chargement du bouton
     function setLoading(isLoading) {
         if (submitBtn) {
             submitBtn.disabled = isLoading;
-            submitBtn.textContent = isLoading ? "Traitement en cours..." : (isLoginMode ? "Se connecter" : "S'inscrire");
+            submitBtn.textContent = isLoading ? "Traitement..." : (isLoginMode ? "Se connecter" : "S'inscrire");
         }
     }
 
-    // Affichage du tableau de bord vendeur
     function showDashboard() {
         if (authContainer) authContainer.classList.add("hidden");
         if (dashboardContainer) dashboardContainer.classList.remove("hidden");
@@ -213,22 +202,8 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    // Restauration automatique de la session si l'utilisateur est déjà connecté
     const session = localStorage.getItem("vendor_session");
     if (session) {
         showDashboard();
     }
 });
-
-// Dans admin.js, après une connexion ou un chargement réussi du dashboard
-function displayVendorShareLink(shopId) {
-    // Récupère l'URL de base du site (ex: https://hankeo.github.io/marketplace/index.html)
-    const baseUrl = window.location.href.replace('admin.html', 'index.html');
-    const vendorLink = `${baseUrl}?v=${encodeURIComponent(shopId)}`;
-
-    // Si tu as un élément HTML dédié dans ton dashboard (ex: <input id="share-link" readonly>)
-    const linkInput = document.getElementById("vendor-share-link");
-    if (linkInput) {
-        linkInput.value = vendorLink;
-    }
-}
