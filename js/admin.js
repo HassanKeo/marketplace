@@ -219,3 +219,16 @@ document.addEventListener("DOMContentLoaded", () => {
         showDashboard();
     }
 });
+
+// Dans admin.js, après une connexion ou un chargement réussi du dashboard
+function displayVendorShareLink(shopId) {
+    // Récupère l'URL de base du site (ex: https://hankeo.github.io/marketplace/index.html)
+    const baseUrl = window.location.href.replace('admin.html', 'index.html');
+    const vendorLink = `${baseUrl}?v=${encodeURIComponent(shopId)}`;
+
+    // Si tu as un élément HTML dédié dans ton dashboard (ex: <input id="share-link" readonly>)
+    const linkInput = document.getElementById("vendor-share-link");
+    if (linkInput) {
+        linkInput.value = vendorLink;
+    }
+}
