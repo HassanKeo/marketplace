@@ -110,7 +110,7 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             const { error: insertError } = await db.from("vendeurs").insert([
-                { id: shopId, nom_boutique: shopName, whatsapp: whatsapp, password: password }
+                { id: shopId, nom_boutique: shopName, telephone_whatsapp: whatsapp, mot_de_passe: password }
             ]);
 
             if (insertError) throw insertError;
@@ -131,7 +131,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 .from("vendeurs")
                 .select("*")
                 .eq("id", shopId)
-                .eq("password", password)
+                .eq("mot_de_passe", password)
                 .maybeSingle();
 
             if (error) throw error;
@@ -145,7 +145,7 @@ document.addEventListener("DOMContentLoaded", () => {
             localStorage.setItem("vendor_session", JSON.stringify({
                 shopId: data.id,
                 shopName: data.nom_boutique,
-                whatsapp: data.whatsapp
+                whatsapp: data.telephone_whatsapp
             }));
 
             showDashboard();
