@@ -188,7 +188,6 @@ document.addEventListener("DOMContentLoaded", () => {
         loadVendorOrders();
     }
 
-    // Gestion de la déconnexion
     if (logoutBtn) {
         logoutBtn.addEventListener("click", () => {
             localStorage.removeItem("vendor_session");
@@ -196,7 +195,6 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // Charger les produits du vendeur connecté
     async function loadVendorProducts() {
         const session = getSession();
         if (!session || !productsList) return;
@@ -207,8 +205,8 @@ document.addEventListener("DOMContentLoaded", () => {
             const { data: products, error } = await db
                 .from("produits")
                 .select("*")
-                .eq("vendeur_id", session.shopId)
-                .order("created_at", { ascending: false });
+                .eq("vendor_id", session.shopId)
+                .order("cree_le", { ascending: false });
 
             if (error) throw error;
 
@@ -239,7 +237,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    // Exposer globalement pour le bouton supprimer
     window.loadVendorProducts = loadVendorProducts;
 
     window.deleteProduct = async function(productId) {
@@ -253,7 +250,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     };
 
-    // Ajouter un produit avec upload ImgBB
     if (productForm) {
         productForm.addEventListener("submit", async (e) => {
             e.preventDefault();
@@ -276,13 +272,11 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             try {
-                // 1. Compression de l'image via compress.js
                 let fileToUpload = imageFile;
                 if (typeof window.compressImage === "function") {
                     fileToUpload = await window.compressImage(imageFile, { quality: 0.8, maxWidth: 1000 });
                 }
 
-                // 2. Upload vers ImgBB
                 const formData = new FormData();
                 formData.append("image", fileToUpload);
 
@@ -298,10 +292,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 const imageUrl = imgbbData.data.url;
 
-                // 3. Enregistrement dans Supabase
                 const { error: insertError } = await db.from("produits").insert([
                     {
-                        vendeur_id: session.shopId,
+                        vendor_id: session.shopId,
                         nom: name,
                         prix: price,
                         description: description,
@@ -311,7 +304,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 if (insertError) throw insertError;
 
-                // Réinitialiser le formulaire et rafraîchir la liste
                 productForm.reset();
                 loadVendorProducts();
                 alert("Produit ajouté avec succès !");
@@ -327,7 +319,6 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // Charger les commandes reçues (si la table commandes existe)
     async function loadVendorOrders() {
         const session = getSession();
         if (!session || !ordersList) return;
@@ -365,7 +356,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    // --- 3. FONCTIONS UTILITAIRES ---
+   // --- 3. FONCTIONS UTILITAIRES ---
 
     function showError(inputElement, message) {
         if (!inputElement) return;
@@ -405,7 +396,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    // Vérifier si une session active existe déjà au chargement de la page
     const session = getSession();
     if (session) {
         showDashboard();
