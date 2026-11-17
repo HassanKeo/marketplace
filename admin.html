@@ -13,13 +13,13 @@
 
     <!-- En-tête Admin -->
     <header class="bg-white shadow-sm border-b">
-        <div class="max-w-4xl mx-auto px-4 py-4 flex justify-between items-center">
+        <div class="max-w-5xl mx-auto px-4 py-4 flex justify-between items-center">
             <h1 class="text-xl font-bold text-gray-800">Tableau de Bord Vendeur</h1>
             <div id="auth-status" class="text-sm text-gray-500">Non connecté</div>
         </div>
     </header>
 
-    <main class="max-w-4xl mx-auto px-4 py-6">
+    <main class="max-w-5xl mx-auto px-4 py-6 space-y-6">
         
         <!-- SECTION 1 : CONNEXION / INSCRIPTION -->
         <section id="auth-container" class="bg-white p-6 rounded-xl shadow-sm border max-w-md mx-auto">
@@ -31,7 +31,6 @@
                     <input type="text" id="shop_id" required class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="ex: ma-boutique">
                 </div>
 
-                <!-- Champs supplémentaires pour l'inscription (Cachés par défaut) -->
                 <div id="signup-fields" class="hidden space-y-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Nom de la boutique</label>
@@ -58,49 +57,62 @@
 
         <!-- SECTION 2 : TABLEAU DE BORD (Caché par défaut) -->
         <section id="dashboard-container" class="hidden space-y-6">
-            <div class="bg-white p-6 rounded-xl shadow-sm border flex justify-between items-center">
+            
+            <!-- En-tête du Dashboard & Partage de lien -->
+            <div class="bg-white p-6 rounded-xl shadow-sm border flex flex-col md:flex-row justify-between items-center gap-4">
                 <div>
                     <h2 id="welcome-shop" class="text-xl font-bold text-gray-800">Bienvenue</h2>
-                    <p class="text-sm text-gray-500">Gère tes produits et suis tes commandes ici.</p>
+                    <p class="text-sm text-gray-500">Gère ton catalogue et suis tes commandes en temps réel.</p>
                 </div>
-                <button id="logout-btn" class="bg-red-50 text-red-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-100 transition">Déconnexion</button>
+                <div class="flex items-center gap-2 w-full md:w-auto">
+                    <input type="text" id="shop-link-input" readonly class="px-3 py-2 text-xs bg-gray-100 border rounded-lg w-full md:w-64 text-gray-600 outline-none">
+                    <button id="copy-link-btn" class="bg-blue-50 text-blue-600 px-3 py-2 rounded-lg text-xs font-semibold hover:bg-blue-100 transition whitespace-nowrap">Copier le lien</button>
+                    <button id="logout-btn" class="bg-red-50 text-red-600 px-3 py-2 rounded-lg text-xs font-semibold hover:bg-red-100 transition whitespace-nowrap">Déconnexion</button>
+                </div>
             </div>
 
-            <!-- Formulaire d'ajout de produit -->
+            <!-- Formulaire d'ajout / modification de produit -->
             <div class="bg-white p-6 rounded-xl shadow-sm border">
-                <h3 class="text-lg font-semibold mb-4">Ajouter un produit</h3>
-                <form id="product-form" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <h3 id="form-section-title" class="text-lg font-semibold mb-4">Ajouter un produit</h3>
+                <form id="product-form" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <input type="hidden" id="edit-product-id">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Nom du produit</label>
-                        <input type="text" id="prod-name" required class="w-full px-3 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-blue-500" placeholder="ex: Chaussures Nike Air Max">
+                        <input type="text" id="prod-name" required class="w-full px-3 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-blue-500" placeholder="ex: Chaussures Nike">
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Prix (FCFA)</label>
                         <input type="number" id="prod-price" required class="w-full px-3 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-blue-500" placeholder="ex: 15000">
                     </div>
-                    <div class="md:col-span-2">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                        <textarea id="prod-desc" rows="3" class="w-full px-3 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-400 text-sm" placeholder="Décris ton produit en détail (tailles disponibles, couleurs, matière, état...) pour éviter que les clients ne posent trop de questions en boucle sur WhatsApp !"></textarea>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Stock initial</label>
+                        <input type="number" id="prod-stock" required min="0" value="10" class="w-full px-3 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-blue-500" placeholder="ex: 10">
                     </div>
-                    <div class="md:col-span-2">
+                    <div class="md:col-span-3">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Description détaillée</label>
+                        <textarea id="prod-desc" rows="2" class="w-full px-3 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-400 text-sm" placeholder="Décris ton produit (tailles, couleurs, matière...) pour éviter les questions répétitives sur WhatsApp !"></textarea>
+                    </div>
+                    <div class="md:col-span-3">
                         <label class="block text-sm font-medium text-gray-700 mb-1">Image du produit</label>
-                        <input type="file" id="prod-image" accept="image/*" required class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                        <input type="file" id="prod-image" accept="image/*" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                        <p class="text-xs text-gray-400 mt-1">Laisse vide si tu ne souhaites pas modifier l'image existante lors d'une édition.</p>
                     </div>
-                    <div class="md:col-span-2">
-                        <button type="submit" id="save-prod-btn" class="w-full bg-green-600 text-white py-2 rounded-lg font-medium hover:bg-green-700 transition">Ajouter au catalogue</button>
+                    <div class="md:col-span-3 flex gap-2">
+                        <button type="submit" id="save-prod-btn" class="flex-1 bg-green-600 text-white py-2.5 rounded-lg font-medium hover:bg-green-700 transition">Ajouter au catalogue</button>
+                        <button type="button" id="cancel-edit-btn" class="hidden bg-gray-300 text-gray-700 px-4 py-2.5 rounded-lg font-medium hover:bg-gray-400 transition">Annuler</button>
                     </div>
                 </form>
             </div>
 
-            <!-- Liste des produits et commandes -->
+            <!-- Listes : Mes Produits & Commandes reçues -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div class="bg-white p-6 rounded-xl shadow-sm border">
-                    <h3 class="text-lg font-semibold mb-4">Mes Produits</h3>
-                    <div id="products-list" class="space-y-3 text-sm text-gray-600">Chargement...</div>
+                <div class="bg-white p-6 rounded-xl shadow-sm border flex flex-col">
+                    <h3 class="text-lg font-semibold mb-4">Mon Catalogue Produits</h3>
+                    <div id="products-list" class="space-y-3 text-sm text-gray-600 overflow-y-auto max-h-[500px]">Chargement...</div>
                 </div>
-                <div class="bg-white p-6 rounded-xl shadow-sm border">
+                <div class="bg-white p-6 rounded-xl shadow-sm border flex flex-col">
                     <h3 class="text-lg font-semibold mb-4">Commandes reçues</h3>
-                    <div id="orders-list" class="space-y-3 text-sm text-gray-600">Chargement...</div>
+                    <div id="orders-list" class="space-y-3 text-sm text-gray-600 overflow-y-auto max-h-[500px]">Chargement...</div>
                 </div>
             </div>
         </section>
