@@ -25,16 +25,21 @@
     <!-- Corps de la Boutique -->
     <main class="max-w-6xl mx-auto px-4 py-8 flex-grow w-full">
         <div id="products-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            <!-- Les produits injectés dynamiquement par JS -->
             <p class="text-gray-400 col-span-full text-center py-12">Chargement des produits...</p>
         </div>
     </main>
 
     <!-- Modal de commande / Tunnel d'achat -->
     <div id="order-modal" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center p-4 z-50">
-        <div class="bg-white rounded-xl max-w-md w-full p-6 space-y-4 shadow-xl relative">
+        <div class="bg-white rounded-xl max-w-md w-full p-6 space-y-4 shadow-xl relative max-h-[90vh] overflow-y-auto">
             <h3 id="modal-product-title" class="text-lg font-bold text-gray-800">Commander ce produit</h3>
             
+            <!-- Accordéon déroulant pour la description du produit -->
+            <details id="modal-desc-details" class="text-xs text-gray-600 bg-gray-50 p-3 rounded-lg border">
+                <summary class="font-medium text-gray-700 cursor-pointer select-none">Des questions? lisez la description du produit</summary>
+                <p id="modal-product-desc" class="mt-2 pt-2 border-t text-gray-600 whitespace-pre-line">Aucune description détaillée fournie.</p>
+            </details>
+
             <form id="order-form" class="space-y-3">
                 <input type="hidden" id="modal-product-id">
                 <input type="hidden" id="modal-vendor-id">
