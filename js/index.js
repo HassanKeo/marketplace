@@ -1,118 +1,180 @@
 // js/index.js
 
 document.addEventListener("DOMContentLoaded", async () => {
+    const shopTitle = document.getElementById("shop-title");
+    const shopSubtitle = document.getElementById("shop-subtitle");
+    const productsGrid = document.getElementById("products-grid");
+
+    const orderModal = document.getElementById("order-modal");
+    const orderForm = document.getElementById("order-form");
+    const closeModalBtn = document.getElementById("close-modal-btn");
+    const modalProductTitle = document.getElementById("modal-product-title");
+    const modalProductId = document.getElementById("modal-product-id");
+    const modalVendorId = document.getElementById("modal-vendor-id");
+    const modalQty = document.getElementById("modal-qty");
+    const modalPhone = document.getElementById("modal-phone");
+    const modalLocation = document.getElementById("modal-location");
+
+    let currentVendorWhatsapp = "";
+
+    // Récupérer l'ID de la boutique depuis l'URL (ex: index.html?v=ma-boutique)
     const urlParams = new URLSearchParams(window.location.search);
-    const vendorId = urlParams.get("v"); // Récupère ?v=...
+    const vendorId = urlParams.get("v");
 
-    const container = document.getElementById("products-container");
-    const pageTitle = document.getElementById("page-title"); // Optionnel : titre de la page ou de la boutique
-
-    if (!container) return;
-
-    // Afficher un état de chargement
-    container.innerHTML = `<p class="text-center col-span-full text-gray-500 py-8">Chargement des produits...</p>`;
-
-    if (vendorId) {
-        // --- MODE BOUTIQUE SPÉCIFIQUE ---
-        await loadVendorStore(vendorId, container, pageTitle);
-    } else {
-        // --- MODE MARKETPLACE GLOBALE ---
-        await loadAllProducts(container, pageTitle);
-    }
-});
-
-// Charger uniquement les produits d'un vendeur spécifique
-async function loadVendorStore(vendorId, container, pageTitle) {
-    try {
-        // 1. Récupérer les infos du vendeur pour afficher le nom de sa boutique
-        const { data: vendor, error: vendorError } = await db
-            .from("vendeurs")
-            .select("nom_boutique, whatsapp")
-            .eq("id", vendorId)
-            .maybeSingle();
-
-        if (vendorError || !vendor) {
-            container.innerHTML = `<p class="text-center col-span-full text-red-600 py-8">Oups ! Cette boutique n'existe pas ou a été supprimée.</p>`;
-            return;
-        }
-
-        // Mettre à jour le titre de la page si l'élément existe
-        if (pageTitle) {
-            pageTitle.textContent = `Boutique : ${vendor.nom_boutique}`;
-        }
-
-        // 2. Récupérer les produits de ce vendeur
-        const { data: products, error: prodError } = await db
-            .from("produits")
-            .select("*")
-            .eq("vendeur_id", vendorId)
-            .order("created_at", { ascending: false });
-
-        if (prodError) throw prodError;
-
-        renderProducts(products, container, vendor.whatsapp);
-    } catch (err) {
-        console.error("Erreur chargement boutique :", err);
-        container.innerHTML = `<p class="text-center col-span-full text-red-600 py-8">Erreur lors du chargement des produits de la boutique.</p>`;
-    }
-}
-
-// Charger tous les produits de la marketplace
-async function loadAllProducts(container, pageTitle) {
-    try {
-        if (pageTitle) {
-            pageTitle.textContent = "Catalogue de la Marketplace";
-        }
-
-        const { data: products, error } = await db
-            .from("produits")
-            .select("*, vendeurs(nom_boutique, whatsapp)")
-            .order("created_at", { ascending: false });
-
-        if (error) throw error;
-
-        renderProducts(products, container, null);
-    } catch (err) {
-        console.error("Erreur chargement catalogue :", err);
-        container.innerHTML = `<p class="text-center col-span-full text-red-600 py-8">Erreur de chargement du catalogue.</p>`;
-    }
-}
-
-// Afficher les produits sous forme de grille HTML (Tailwind CSS)
-function renderProducts(products, container, defaultWhatsapp) {
-    if (!products || products.length === 0) {
-        container.innerHTML = `<p class="text-center col-span-full text-gray-500 py-12">Aucun produit disponible pour le moment.</p>`;
+    if (!vendorId) {
+        shopTitle.textContent = "Boutique introuvable";
+        shopSubtitle.textContent = "Aucun identifiant de vendeur spécifié dans le lien.";
+        productsGrid.innerHTML = `<p class="text-red-500 col-span-full text-center">Veuillez utiliser un lien de boutique valide (ex: ?v=nom_de_boutique).</p>`;
         return;
     }
 
-    container.innerHTML = "";
+    await loadStoreData(vendorId);
 
-    products.forEach(product => {
-        // Gérer le numéro WhatsApp (soit celui de la boutique spécifique, soit celui lié au produit)
-        const whatsappNumber = defaultWhatsapp || (product.vendeurs ? product.vendeurs.whatsapp : "") || "";
-        const productName = encodeURIComponent(product.nom || product.titre || "Article");
-        const whatsappUrl = whatsappNumber 
-            ? `https://wa.me/${whatsappNumber.replace("+", "")}?text=Bonjour,%20je%20suis%20intéressé(e)%20par%20votre%20produit%20:${productName}`
-            : "#";
+    async function loadStoreData(vId) {
+        try {
+            // 1. Charger les informations du vendeur
+            const { data: vendor, error: vendorError } = await db
+                .from("vendeurs")
+                .select("*")
+                .eq("id", vId)
+                .maybeSingle();
 
-        const card = document.createElement("div");
-        card.className = "bg-white rounded-lg shadow-md overflow-hidden border border-gray-100 flex flex-col justify-between hover:shadow-lg transition-shadow";
+            if (vendorError || !vendor) {
+                shopTitle.textContent = "Boutique introuvable";
+                shopSubtitle.textContent = "Cette boutique n'existe pas ou a été supprimée.";
+                productsGrid.innerHTML = `<p class="text-red-500 col-span-full text-center">Impossible de charger la boutique.</p>`;
+                return;
+            }
 
-        card.innerHTML = `
-            <div>
-                <img src="${product.image_url || 'https://via.placeholder.com/300'}" alt="${product.nom || 'Produit'}" class="w-full h-48 object-cover bg-gray-100">
-                <div class="p-4">
-                    <h3 class="font-bold text-lg text-gray-800 mb-1">${product.nom || product.titre || 'Sans nom'}</h3>
-                    <p class="text-blue-600 font-semibold text-base mb-2">${product.prix ? product.prix.toLocaleString() + ' FCFA' : 'Prix sur demande'}</p>
-                    <p class="text-gray-600 text-sm line-clamp-2">${product.description || 'Aucune description fournie.'}</p>
-                </div>
-            </div>
-            <div class="p-4 pt-0">
-                <a href="${whatsappUrl}" target="_blank" class="block w-full text-center bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded transition-colors text-sm">
-                    Commander sur WhatsApp
-                </a>
-            </div>
-        `;
-        container.appendChild(card);
-    });
-}
+            shopTitle.textContent = vendor.nom_boutique;
+            shopSubtitle.textContent = "Commandez directement en ligne ou via WhatsApp";
+            currentVendorWhatsapp = vendor.telephone_whatsapp;
+
+            // 2. Charger les produits de cette boutique
+            const { data: products, error: prodError } = await db
+                .from("produits")
+                .select("*")
+                .eq("vendor_id", vId)
+                .order("cree_le", { ascending: false });
+
+            if (prodError) throw prodError;
+
+            if (!products || products.length === 0) {
+                productsGrid.innerHTML = `<p class="text-gray-500 col-span-full text-center py-12">Cette boutique n'a aucun produit pour le moment.</p>`;
+                return;
+            }
+
+            productsGrid.innerHTML = "";
+            products.forEach(prod => {
+                const isOutOfStock = (prod.stock !== undefined && prod.stock <= 0);
+                const card = document.createElement("div");
+                // Carte visuellement grisée ou rouge si le stock est épuisé
+                card.className = `bg-white border rounded-xl overflow-hidden shadow-sm flex flex-col justify-between transition ${isOutOfStock ? 'opacity-60 border-red-200' : 'hover:shadow-md'}`;
+                
+                card.innerHTML = `
+                    <div>
+                        <div class="h-48 w-full bg-gray-100 relative overflow-hidden">
+                            <img src="${prod.image_url || 'https://via.placeholder.com/300'}" alt="${prod.nom}" class="w-full h-full object-cover">
+                            ${isOutOfStock ? '<span class="absolute top-2 right-2 bg-red-600 text-white text-xs px-2 py-1 rounded font-semibold">Épuisé</span>' : ''}
+                        </div>
+                        <div class="p-4 space-y-2">
+                            <h3 class="font-bold text-gray-800 text-base">${prod.nom}</h3>
+                            <p class="text-blue-600 font-bold text-sm">${prod.prix.toLocaleString()} FCFA</p>
+                            <p class="text-xs text-gray-600 line-clamp-3 whitespace-pre-line">${prod.description || 'Aucune description détaillée fournie.'}</p>
+                        </div>
+                    </div>
+                    <div class="p-4 pt-0">
+                        <button onclick="window.openOrderModal('${prod.id}', '${escapeHtml(prod.nom)}', '${vId}', ${prod.stock || 0})" 
+                            class="w-full py-2 rounded-lg text-xs font-semibold transition ${isOutOfStock ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-green-600 text-white hover:bg-green-700'}"
+                            ${isOutOfStock ? 'disabled' : ''}>
+                            ${isOutOfStock ? 'Rupture de stock' : 'Commander'}
+                        </button>
+                    </div>
+                `;
+                productsGrid.appendChild(card);
+            });
+
+        } catch (err) {
+            console.error(err);
+            productsGrid.innerHTML = `<p class="text-red-500 col-span-full text-center">Erreur lors du chargement du catalogue.</p>`;
+        }
+    }
+
+    // --- GESTION DU MODAL DE COMMANDE ---
+
+    window.openOrderModal = function(productId, productName, vId, stock) {
+        if (stock <= 0) {
+            alert("Désolé, ce produit est en rupture de stock.");
+            return;
+        }
+        if (modalProductTitle) modalProductTitle.textContent = `Commander : ${productName}`;
+        if (modalProductId) modalProductId.value = productId;
+        if (modalVendorId) modalVendorId.value = vId;
+        if (modalQty) {
+            modalQty.value = 1;
+            modalQty.max = stock;
+        }
+        if (orderModal) orderModal.classList.remove("hidden");
+    };
+
+    if (closeModalBtn && orderModal) {
+        closeModalBtn.addEventListener("click", () => {
+            orderModal.classList.add("hidden");
+        });
+    }
+
+    // Soumission de la commande et redirection WhatsApp
+    if (orderForm) {
+        orderForm.addEventListener("submit", async (e) => {
+            e.preventDefault();
+
+            const pId = modalProductId.value;
+            const vId = modalVendorId.value;
+            const qty = parseInt(modalQty.value);
+            const phone = modalPhone.value.trim();
+            const location = modalLocation.value.trim();
+
+            if (!phone || !location || isNaN(qty) || qty < 1) {
+                alert("Veuillez remplir tous les champs correctement.");
+                return;
+            }
+
+            try {
+                // 1. Enregistrer la commande dans la table 'commandes' de Supabase
+                const { error: insertError } = await db.from("commandes").insert([
+                    {
+                        vendor_id: vId,
+                        produit_id: pId,
+                        quantite: qty,
+                        telephone_client: phone,
+                        lieu_livraison: location,
+                        statut: 'en_attente'
+                    }
+                ]);
+
+                if (insertError) throw insertError;
+
+                // 2. Construire le message WhatsApp formaté pour le vendeur
+                const productName = modalProductTitle.textContent.replace("Commander : ", "");
+                const whatsappMessage = encodeURIComponent(
+                    `Bonjour, je souhaite passer commande :\n\n- Produit : *${productName}*\n- Quantité : *${qty}*\n- Lieu de livraison : *${location}*\n- Mon contact : *${phone}*`
+                );
+
+                // Fermer le modal et rediriger vers l'application WhatsApp
+                orderModal.classList.add("hidden");
+                orderForm.reset();
+
+                const cleanWhatsappNumber = currentVendorWhatsapp.replace(/[^0-9+]/g, "");
+                window.open(`https://wa.me/${cleanWhatsappNumber}?text=${whatsappMessage}`, "_blank");
+
+            } catch (err) {
+                console.error(err);
+                alert("Erreur lors de l'enregistrement de la commande : " + (err.message || "Problème réseau."));
+            }
+        });
+    }
+
+    function escapeHtml(str) {
+        return str.replace(/'/g, "&#39;").replace(/"/g, "&quot;");
+    }
+});
