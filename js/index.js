@@ -68,7 +68,6 @@ document.addEventListener("DOMContentLoaded", async () => {
             products.forEach(prod => {
                 const isOutOfStock = (prod.stock !== undefined && prod.stock <= 0);
                 const card = document.createElement("div");
-                // Carte visuellement grisée ou rouge si le stock est épuisé
                 card.className = `bg-white border rounded-xl overflow-hidden shadow-sm flex flex-col justify-between transition ${isOutOfStock ? 'opacity-60 border-red-200' : 'hover:shadow-md'}`;
                 
                 card.innerHTML = `
@@ -80,10 +79,15 @@ document.addEventListener("DOMContentLoaded", async () => {
                         <div class="p-4 space-y-2">
                             <h3 class="font-bold text-gray-800 text-base">${prod.nom}</h3>
                             <p class="text-blue-600 font-bold text-sm">${prod.prix.toLocaleString()} FCFA</p>
-                            <p class="text-xs text-gray-600 line-clamp-3 whitespace-pre-line">${prod.description || 'Aucune description détaillée fournie.'}</p>
+                            
+                            <!-- Accordéon déroulant pour la description -->
+                            <details class="text-xs text-gray-600 bg-gray-50 p-2 rounded-lg border">
+                                <summary class="font-medium text-gray-700 cursor-pointer select-none">Des questions? lisez la description du produit</summary>
+                                <p class="mt-2 pt-2 border-t text-gray-600 whitespace-pre-line">${prod.description || 'Aucune description détaillée fournie.'}</p>
+                            </details>
                         </div>
                     </div>
-                    <div class="p-4 pt-0">
+                    <div class="p-4 pt-2">
                         <button onclick="window.openOrderModal('${prod.id}', '${escapeHtml(prod.nom)}', '${vId}', ${prod.stock || 0})" 
                             class="w-full py-2 rounded-lg text-xs font-semibold transition ${isOutOfStock ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-green-600 text-white hover:bg-green-700'}"
                             ${isOutOfStock ? 'disabled' : ''}>
