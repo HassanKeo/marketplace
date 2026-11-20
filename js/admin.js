@@ -3,6 +3,7 @@
 document.addEventListener("DOMContentLoaded", () => {
     const authContainer = document.getElementById("auth-container");
     const dashboardContainer = document.getElementById("dashboard-container");
+    const authStatus = document.getElementById("auth-status");
     const authTitle = document.getElementById("auth-title");
     const authForm = document.getElementById("auth-form");
     const submitBtn = document.getElementById("submit-btn");
@@ -11,7 +12,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const welcomeShop = document.getElementById("welcome-shop");
     const shopLinkInput = document.getElementById("shop-link-input");
     const copyLinkBtn = document.getElementById("copy-link-btn");
-    
+
     const signupFields = document.getElementById("signup-fields");
     const shopNameInput = document.getElementById("shop_name");
     const whatsappInput = document.getElementById("whatsapp");
@@ -29,11 +30,13 @@ document.addEventListener("DOMContentLoaded", () => {
     const prodStockInput = document.getElementById("prod-stock");
     const prodDescInput = document.getElementById("prod-desc");
     const prodImageInput = document.getElementById("prod-image");
-    
+
     const productsList = document.getElementById("products-list");
     const ordersList = document.getElementById("orders-list");
 
     let isLoginMode = true;
+    const productsCache = new Map();
+    const processingOrderIds = new Set();
 
     // --- 1. AUTHENTIFICATION & SESSION ---
 
@@ -180,18 +183,27 @@ document.addEventListener("DOMContentLoaded", () => {
         return sessionStr ? JSON.parse(sessionStr) : null;
     }
 
+    function buildStoreUrl(shopId) {
+        const baseUrl = new URL("./index.html", window.location.href);
+        baseUrl.search = "";
+        baseUrl.searchParams.set("v", shopId);
+        return baseUrl.toString();
+    }
+
     function showDashboard() {
         if (authContainer) authContainer.classList.add("hidden");
         if (dashboardContainer) dashboardContainer.classList.remove("hidden");
-        
+
         const session = getSession();
         if (session) {
-            if (welcomeShop) welcomeShop.textContent = `Bienvenue, ${session.shopName}`;
-            
-            // Génération du lien personnalisé de la boutique
+            if (authStatus) {
+                authStatus.textContent = `Connecté : @${session.shopId}`;
+            }
+            if (welcomeShop) {
+                welcomeShop.textContent = `Bienvenue, ${session.shopName}`;
+            }
             if (shopLinkInput) {
-                const currentUrl = window.location.href.replace("admin.html", "index.html");
-                shopLinkInput.value = `${currentUrl.split('?')[0]}?v=${session.shopId}`;
+                shopLinkInput.value = buildStoreUrl(session.shopId);
             }
         }
 
@@ -202,6 +214,9 @@ document.addEventListener("DOMContentLoaded", () => {
     if (logoutBtn) {
         logoutBtn.addEventListener("click", () => {
             localStorage.removeItem("vendor_session");
+            if (authStatus) {
+                authStatus.textContent = "Non connecté";
+            }
             window.location.reload();
         });
     }
@@ -232,6 +247,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
             if (error) throw error;
 
+            productsCache.clear();
+
             if (!products || products.length === 0) {
                 productsList.innerHTML = `<p class="text-gray-500 italic">Aucun produit dans votre catalogue.</p>`;
                 return;
@@ -239,24 +256,32 @@ document.addEventListener("DOMContentLoaded", () => {
 
             productsList.innerHTML = "";
             products.forEach(prod => {
+                productsCache.set(String(prod.id), prod);
+
                 const isOutOfStock = (prod.stock !== undefined && prod.stock <= 0);
                 const card = document.createElement("div");
                 card.className = `flex items-center justify-between p-3 border rounded-lg transition ${isOutOfStock ? 'bg-red-50 border-red-300' : 'bg-gray-50'}`;
-                
+
+                const safeId = escapeHtml(String(prod.id));
+                const safeName = escapeHtml(prod.nom || "");
+                const safePrice = Number(prod.prix || 0).toLocaleString();
+                const safeStock = prod.stock !== undefined ? escapeHtml(String(prod.stock)) : "N/A";
+                const safeImgUrl = escapeHtml(prod.image_url || "https://via.placeholder.com/50");
+
                 card.innerHTML = `
                     <div class="flex items-center space-x-3">
-                        <img src="${prod.image_url || 'https://via.placeholder.com/50'}" class="w-12 h-12 object-cover rounded-md border">
+                        <img src="${safeImgUrl}" alt="${safeName}" class="w-12 h-12 object-cover rounded-md border">
                         <div>
-                            <h4 class="font-bold text-gray-800">${prod.nom}</h4>
-                            <p class="text-xs text-blue-600 font-semibold">${prod.prix.toLocaleString()} FCFA</p>
+                            <h4 class="font-bold text-gray-800">${safeName}</h4>
+                            <p class="text-xs text-blue-600 font-semibold">${safePrice} FCFA</p>
                             <p class="text-xs font-bold ${isOutOfStock ? 'text-red-600' : 'text-gray-500'}">
-                                Stock : ${prod.stock !== undefined ? prod.stock : 'N/A'} ${isOutOfStock ? '(Épuisé)' : ''}
+                                Stock : ${safeStock} ${isOutOfStock ? '(Épuisé)' : ''}
                             </p>
                         </div>
                     </div>
                     <div class="flex items-center space-x-2">
-                        <button onclick="window.editProductModal('${prod.id}', '${escapeHtml(prod.nom)}', ${prod.prix}, ${prod.stock || 0}, '${escapeHtml(prod.description || '')}')" class="text-blue-600 hover:text-blue-800 text-xs font-medium px-2 py-1 bg-blue-50 rounded border border-blue-200">Modifier</button>
-                        <button onclick="window.deleteProduct('${prod.id}')" class="text-red-500 hover:text-red-700 text-xs font-medium px-2 py-1 bg-red-50 rounded border border-red-200">Supprimer</button>
+                        <button type="button" onclick="window.editProductModal('${safeId}')" class="text-blue-600 hover:text-blue-800 text-xs font-medium px-2 py-1 bg-blue-50 rounded border border-blue-200">Modifier</button>
+                        <button type="button" onclick="window.deleteProduct('${safeId}')" class="text-red-500 hover:text-red-700 text-xs font-medium px-2 py-1 bg-red-50 rounded border border-red-200">Supprimer</button>
                     </div>
                 `;
                 productsList.appendChild(card);
@@ -270,17 +295,20 @@ document.addEventListener("DOMContentLoaded", () => {
     window.loadVendorProducts = loadVendorProducts;
 
     // Préparer le formulaire pour l'édition d'un produit
-    window.editProductModal = function(id, name, price, stock, desc) {
-        if (editProductIdInput) editProductIdInput.value = id;
-        if (prodNameInput) prodNameInput.value = name;
-        if (prodPriceInput) prodPriceInput.value = price;
-        if (prodStockInput) prodStockInput.value = stock;
-        if (prodDescInput) prodDescInput.value = desc;
+    window.editProductModal = function(id) {
+        const prod = productsCache.get(String(id));
+        if (!prod) return;
+
+        if (editProductIdInput) editProductIdInput.value = prod.id;
+        if (prodNameInput) prodNameInput.value = prod.nom || "";
+        if (prodPriceInput) prodPriceInput.value = prod.prix ?? "";
+        if (prodStockInput) prodStockInput.value = prod.stock ?? 0;
+        if (prodDescInput) prodDescInput.value = prod.description || "";
 
         if (formSectionTitle) formSectionTitle.textContent = "Modifier le produit";
         if (saveProdBtn) saveProdBtn.textContent = "Mettre à jour";
         if (cancelEditBtn) cancelEditBtn.classList.remove("hidden");
-        
+
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
@@ -303,6 +331,7 @@ document.addEventListener("DOMContentLoaded", () => {
         try {
             const { error } = await db.from("produits").delete().eq("id", productId);
             if (error) throw error;
+            productsCache.delete(String(productId));
             loadVendorProducts();
         } catch (err) {
             alert("Erreur lors de la suppression : " + err.message);
@@ -319,7 +348,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const productId = editProductIdInput.value;
             const name = prodNameInput.value.trim();
             const price = parseFloat(prodPriceInput.value);
-            const stock = parseInt(prodStockInput.value);
+            const stock = parseInt(prodStockInput.value, 10);
             const description = prodDescInput.value.trim();
             const imageFile = prodImageInput.files[0];
 
@@ -379,8 +408,6 @@ document.addEventListener("DOMContentLoaded", () => {
                     // --- MODE CRÉATION ---
                     if (!imageUrl) {
                         alert("Veuillez joindre une image pour un nouveau produit.");
-                        saveProdBtn.disabled = false;
-                        saveProdBtn.textContent = "Ajouter au catalogue";
                         return;
                     }
 
@@ -407,7 +434,7 @@ document.addEventListener("DOMContentLoaded", () => {
             } finally {
                 if (saveProdBtn) {
                     saveProdBtn.disabled = false;
-                    saveProdBtn.textContent = editProductIdInput.value ? "Mettre à jour" : "Ajouter au catalogue";
+                    saveProdBtn.textContent = editProductIdInput && editProductIdInput.value ? "Mettre à jour" : "Ajouter au catalogue";
                 }
             }
         });
@@ -438,26 +465,36 @@ document.addEventListener("DOMContentLoaded", () => {
 
             ordersList.innerHTML = "";
             orders.forEach(ord => {
-                const status = ord.statut || 'en_attente';
+                const status = ord.statut || "en_attente";
                 let statusBadge = '<span class="px-2 py-0.5 text-xs rounded bg-yellow-100 text-yellow-800 font-semibold">En attente</span>';
-                if (status === 'validee') statusBadge = '<span class="px-2 py-0.5 text-xs rounded bg-green-100 text-green-800 font-semibold">Validée</span>';
-                if (status === 'annulee') statusBadge = '<span class="px-2 py-0.5 text-xs rounded bg-red-100 text-red-800 font-semibold">Annulée</span>';
+                if (status === "validee") {
+                    statusBadge = '<span class="px-2 py-0.5 text-xs rounded bg-green-100 text-green-800 font-semibold">Validée</span>';
+                } else if (status === "annulee") {
+                    statusBadge = '<span class="px-2 py-0.5 text-xs rounded bg-red-100 text-red-800 font-semibold">Annulée</span>';
+                }
+
+                const isPending = status === "en_attente";
+                const isLocked = processingOrderIds.has(String(ord.id));
+
+                const actionsHtml = isPending ? `
+                    <div class="flex justify-end space-x-2 pt-2 border-t text-xs">
+                        <button type="button" ${isLocked ? "disabled" : ""} onclick="window.handleOrderAction('${escapeHtml(String(ord.id))}', '${escapeHtml(String(ord.produit_id || ""))}', ${Number(ord.quantite || 0)}, 'validee')" class="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 transition">Valider</button>
+                        <button type="button" ${isLocked ? "disabled" : ""} onclick="window.handleOrderAction('${escapeHtml(String(ord.id))}', '${escapeHtml(String(ord.produit_id || ""))}', ${Number(ord.quantite || 0)}, 'annulee')" class="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50 transition">Annuler</button>
+                    </div>
+                ` : "";
 
                 const item = document.createElement("div");
                 item.className = "p-3 border rounded-lg bg-gray-50 space-y-2";
                 item.innerHTML = `
                     <div class="flex justify-between items-start">
                         <div>
-                            <p class="font-bold text-gray-800">Client : ${ord.telephone_client}</p>
-                            <p class="text-xs text-gray-600">Produit : <span class="font-medium">${ord.produits?.nom || 'Article'}</span> (x${ord.quantite})</p>
-                            <p class="text-xs text-gray-500">Lieu : ${ord.lieu_livraison}</p>
+                            <p class="font-bold text-gray-800">Client : ${escapeHtml(ord.telephone_client || "")}</p>
+                            <p class="text-xs text-gray-600">Produit : <span class="font-medium">${escapeHtml(ord.produits?.nom || "Article")}</span> (x${Number(ord.quantite || 0)})</p>
+                            <p class="text-xs text-gray-500">Lieu : ${escapeHtml(ord.lieu_livraison || "")}</p>
                         </div>
                         <div>${statusBadge}</div>
                     </div>
-                    <div class="flex justify-end space-x-2 pt-2 border-t text-xs">
-                        <button onclick="window.handleOrderAction('${ord.id}', '${ord.produit_id}', ${ord.quantite}, 'validee')" class="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 transition">Valider</button>
-                        <button onclick="window.handleOrderAction('${ord.id}', '${ord.produit_id}', ${ord.quantite}, 'annulee')" class="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 transition">Annuler</button>
-                    </div>
+                    ${actionsHtml}
                 `;
                 ordersList.appendChild(item);
             });
@@ -468,20 +505,41 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Valider ou annuler une commande et mettre à jour le stock automatiquement
     window.handleOrderAction = async function(orderId, produitId, orderedQty, newStatus) {
-        const labelStatus = newStatus === 'validee' ? 'validée' : 'annulée';
+        const orderKey = String(orderId);
+        if (processingOrderIds.has(orderKey)) return;
+
+        const labelStatus = newStatus === "validee" ? "validée" : "annulée";
         if (!confirm(`Voulez-vous vraiment marquer cette commande comme "${labelStatus}" ?`)) return;
 
+        processingOrderIds.add(orderKey);
+        loadVendorOrders();
+
         try {
-            // 1. Mettre à jour le statut de la commande
+            // 1. Vérifier que la commande est toujours en attente avant de la traiter
+            const { data: currentOrder, error: orderFetchError } = await db
+                .from("commandes")
+                .select("statut")
+                .eq("id", orderId)
+                .maybeSingle();
+
+            if (orderFetchError) throw orderFetchError;
+
+            if (!currentOrder || currentOrder.statut !== "en_attente") {
+                alert("Cette commande a déjà été traitée.");
+                return;
+            }
+
+            // 2. Mettre à jour le statut de la commande
             const { error: updateError } = await db
                 .from("commandes")
                 .update({ statut: newStatus })
-                .eq("id", orderId);
+                .eq("id", orderId)
+                .eq("statut", "en_attente");
 
             if (updateError) throw updateError;
 
-            // 2. Si la commande est validée, on décrémente le stock du produit correspondant
-            if (newStatus === 'validee' && produitId) {
+            // 3. Si la commande est validée, on décrémente le stock du produit correspondant
+            if (newStatus === "validee" && produitId) {
                 const { data: prodData, error: prodError } = await db
                     .from("produits")
                     .select("stock")
@@ -489,8 +547,8 @@ document.addEventListener("DOMContentLoaded", () => {
                     .maybeSingle();
 
                 if (!prodError && prodData) {
-                    const currentStock = prodData.stock !== undefined ? prodData.stock : 0;
-                    const newStock = Math.max(0, currentStock - orderedQty);
+                    const currentStock = prodData.stock !== undefined ? Number(prodData.stock) : 0;
+                    const newStock = Math.max(0, currentStock - Number(orderedQty || 0));
 
                     await db
                         .from("produits")
@@ -499,11 +557,13 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
             }
 
-            loadVendorOrders();
-            loadVendorProducts();
             alert(`Commande ${labelStatus} avec succès !`);
         } catch (err) {
             alert("Erreur lors du traitement de la commande : " + err.message);
+        } finally {
+            processingOrderIds.delete(orderKey);
+            await loadVendorOrders();
+            await loadVendorProducts();
         }
     };
 
@@ -548,7 +608,12 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function escapeHtml(str) {
-        return str.replace(/'/g, "&#39;").replace(/"/g, "&quot;");
+        return String(str)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/'/g, "&#39;")
+            .replace(/"/g, "&quot;");
     }
 
     const session = getSession();
