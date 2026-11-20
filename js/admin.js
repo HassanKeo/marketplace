@@ -16,6 +16,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const signupFields = document.getElementById("signup-fields");
     const shopNameInput = document.getElementById("shop_name");
     const whatsappInput = document.getElementById("whatsapp");
+    const licenseKeyInput = document.getElementById("license_key");
     const shopIdInput = document.getElementById("shop_id");
     const passwordInput = document.getElementById("password");
 
@@ -34,7 +35,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const productsList = document.getElementById("products-list");
     const ordersList = document.getElementById("orders-list");
 
-let isLoginMode = true;
+    let isLoginMode = true;
     let currentOrderFilter = "all"; // "all" | "en_attente" | "validee" | "annulee"
     let cachedOrders = [];
     const productsCache = new Map();
@@ -90,6 +91,7 @@ let isLoginMode = true;
             } else {
                 const shopName = shopNameInput ? shopNameInput.value.trim() : "";
                 const whatsapp = whatsappInput ? whatsappInput.value.trim().replace(/\s+/g, "") : "";
+                const licenseKey = licenseKeyInput ? licenseKeyInput.value.trim().toUpperCase() : "";
 
                 if (!shopName) {
                     showError(shopNameInput, "Le nom de la boutique est obligatoire.");
@@ -111,14 +113,41 @@ let isLoginMode = true;
                     return;
                 }
 
-                await handleSignup(shopId, shopName, whatsapp, password);
+                if (!licenseKey) {
+                    showError(licenseKeyInput, "La clé de licence est obligatoire.");
+                    return;
+                }
+
+                await handleSignup(shopId, shopName, whatsapp, password, licenseKey);
             }
         });
     }
 
-    async function handleSignup(shopId, shopName, whatsapp, password) {
+    async function handleSignup(shopId, shopName, whatsapp, password, licenseKey) {
         setLoading(true);
         try {
+            // 1. Vérifier la clé de licence
+            const { data: licence, error: licenceError } = await db
+                .from("licences")
+                .select("code, est_utilisee")
+                .eq("code", licenseKey)
+                .maybeSingle();
+
+            if (licenceError) throw licenceError;
+
+            if (!licence) {
+                showError(licenseKeyInput, "Cette clé de licence est introuvable.");
+                setLoading(false);
+                return;
+            }
+
+            if (licence.est_utilisee) {
+                showError(licenseKeyInput, "Cette clé de licence a déjà été utilisée.");
+                setLoading(false);
+                return;
+            }
+
+            // 2. Vérifier que l'identifiant de boutique est disponible
             const { data: existingVendor, error: checkError } = await db
                 .from("vendeurs")
                 .select("id")
@@ -133,11 +162,33 @@ let isLoginMode = true;
                 return;
             }
 
+            // 3. Créer le compte vendeur
             const { error: insertError } = await db.from("vendeurs").insert([
                 { id: shopId, nom_boutique: shopName, telephone_whatsapp: whatsapp, mot_de_passe: password }
             ]);
 
             if (insertError) throw insertError;
+
+            // 4. Marquer la clé de licence comme utilisée
+            const { data: updatedLicence, error: updateLicenceError } = await db
+                .from("licences")
+                .update({
+                    est_utilisee: true,
+                    utilisee_par: shopId,
+                    utilisee_le: new Date().toISOString()
+                })
+                .eq("code", licenseKey)
+                .eq("est_utilisee", false)
+                .select("code")
+                .maybeSingle();
+
+            if (updateLicenceError) throw updateLicenceError;
+
+            if (!updatedLicence) {
+                showError(licenseKeyInput, "Cette clé de licence vient d'être utilisée.");
+                setLoading(false);
+                return;
+            }
 
             localStorage.setItem("vendor_session", JSON.stringify({ shopId, shopName, whatsapp }));
             showDashboard();
