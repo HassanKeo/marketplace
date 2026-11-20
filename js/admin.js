@@ -440,7 +440,105 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // --- 3. GESTION DES COMMANDES (VALIDATION / ANNULATION & STOCK) ---
+    // --- 3. GESTION DES COMMANDES (FILTRES, VALIDATION / ANNULATION & STOCK) ---
+
+    const ORDER_FILTERS = [
+        { key: "all", label: "Toutes" },
+        { key: "en_attente", label: "En attente" },
+        { key: "validee", label: "Validées" },
+        { key: "annulee", label: "Annulées" }
+    ];
+
+    let ordersFilterBar = null;
+
+    function ensureOrderFilterBar() {
+        if (!ordersList || !ordersList.parentNode) return;
+
+        if (!ordersFilterBar) {
+            ordersFilterBar = document.createElement("div");
+            ordersFilterBar.id = "orders-filter-bar";
+            ordersFilterBar.className = "flex flex-wrap gap-2 mb-3";
+            ordersList.parentNode.insertBefore(ordersFilterBar, ordersList);
+        }
+
+        const counts = {
+            all: cachedOrders.length,
+            en_attente: cachedOrders.filter(o => (o.statut || "en_attente") === "en_attente").length,
+            validee: cachedOrders.filter(o => o.statut === "validee").length,
+            annulee: cachedOrders.filter(o => o.statut === "annulee").length
+        };
+
+        ordersFilterBar.innerHTML = "";
+        ORDER_FILTERS.forEach(f => {
+            const btn = document.createElement("button");
+            btn.type = "button";
+            const isActive = currentOrderFilter === f.key;
+            btn.className = `px-2.5 py-1 text-xs rounded-lg font-medium border transition ${
+                isActive
+                    ? "bg-blue-600 text-white border-blue-600"
+                    : "bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100"
+            }`;
+            btn.textContent = `${f.label} (${counts[f.key]})`;
+            btn.addEventListener("click", () => {
+                currentOrderFilter = f.key;
+                renderOrdersList();
+            });
+            ordersFilterBar.appendChild(btn);
+        });
+    }
+
+    function renderOrdersList() {
+        if (!ordersList) return;
+        ensureOrderFilterBar();
+
+        const filteredOrders = currentOrderFilter === "all"
+            ? cachedOrders
+            : cachedOrders.filter(o => (o.statut || "en_attente") === currentOrderFilter);
+
+        if (filteredOrders.length === 0) {
+            const emptyMsg = currentOrderFilter === "all"
+                ? "Aucune commande reçue."
+                : "Aucune commande dans cette catégorie.";
+            ordersList.innerHTML = `<p class="text-gray-500 italic">${emptyMsg}</p>`;
+            return;
+        }
+
+        ordersList.innerHTML = "";
+        filteredOrders.forEach(ord => {
+            const status = ord.statut || "en_attente";
+            let statusBadge = '<span class="px-2 py-0.5 text-xs rounded bg-yellow-100 text-yellow-800 font-semibold">En attente</span>';
+            if (status === "validee") {
+                statusBadge = '<span class="px-2 py-0.5 text-xs rounded bg-green-100 text-green-800 font-semibold">Validée</span>';
+            } else if (status === "annulee") {
+                statusBadge = '<span class="px-2 py-0.5 text-xs rounded bg-red-100 text-red-800 font-semibold">Annulée</span>';
+            }
+
+            const isPending = status === "en_attente";
+            const isLocked = processingOrderIds.has(String(ord.id));
+
+            const actionsHtml = isPending ? `
+                <div class="flex justify-end space-x-2 pt-2 border-t text-xs">
+                    <button type="button" ${isLocked ? "disabled" : ""} onclick="window.handleOrderAction('${escapeHtml(String(ord.id))}', '${escapeHtml(String(ord.produit_id || ""))}', ${Number(ord.quantite || 0)}, 'validee')" class="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 transition">Valider</button>
+                    <button type="button" ${isLocked ? "disabled" : ""} onclick="window.handleOrderAction('${escapeHtml(String(ord.id))}', '${escapeHtml(String(ord.produit_id || ""))}', ${Number(ord.quantite || 0)}, 'annulee')" class="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50 transition">Annuler</button>
+                </div>
+            ` : "";
+
+            const item = document.createElement("div");
+            item.className = "p-3 border rounded-lg bg-gray-50 space-y-2";
+            item.innerHTML = `
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="font-bold text-gray-800">Client : ${escapeHtml(ord.telephone_client || "")}</p>
+                        <p class="text-xs text-gray-600">Produit : <span class="font-medium">${escapeHtml(ord.produits?.nom || "Article")}</span> (x${Number(ord.quantite || 0)})</p>
+                        <p class="text-xs text-gray-500">Lieu : ${escapeHtml(ord.lieu_livraison || "")}</p>
+                    </div>
+                    <div>${statusBadge}</div>
+                </div>
+                ${actionsHtml}
+            `;
+            ordersList.appendChild(item);
+        });
+    }
 
     async function loadVendorOrders() {
         const session = getSession();
@@ -454,51 +552,17 @@ document.addEventListener("DOMContentLoaded", () => {
                 .order("cree_le", { ascending: false });
 
             if (error) {
+                cachedOrders = [];
+                ensureOrderFilterBar();
                 ordersList.innerHTML = `<p class="text-gray-500 italic">Aucune commande pour le moment.</p>`;
                 return;
             }
 
-            if (!orders || orders.length === 0) {
-                ordersList.innerHTML = `<p class="text-gray-500 italic">Aucune commande reçue.</p>`;
-                return;
-            }
-
-            ordersList.innerHTML = "";
-            orders.forEach(ord => {
-                const status = ord.statut || "en_attente";
-                let statusBadge = '<span class="px-2 py-0.5 text-xs rounded bg-yellow-100 text-yellow-800 font-semibold">En attente</span>';
-                if (status === "validee") {
-                    statusBadge = '<span class="px-2 py-0.5 text-xs rounded bg-green-100 text-green-800 font-semibold">Validée</span>';
-                } else if (status === "annulee") {
-                    statusBadge = '<span class="px-2 py-0.5 text-xs rounded bg-red-100 text-red-800 font-semibold">Annulée</span>';
-                }
-
-                const isPending = status === "en_attente";
-                const isLocked = processingOrderIds.has(String(ord.id));
-
-                const actionsHtml = isPending ? `
-                    <div class="flex justify-end space-x-2 pt-2 border-t text-xs">
-                        <button type="button" ${isLocked ? "disabled" : ""} onclick="window.handleOrderAction('${escapeHtml(String(ord.id))}', '${escapeHtml(String(ord.produit_id || ""))}', ${Number(ord.quantite || 0)}, 'validee')" class="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 transition">Valider</button>
-                        <button type="button" ${isLocked ? "disabled" : ""} onclick="window.handleOrderAction('${escapeHtml(String(ord.id))}', '${escapeHtml(String(ord.produit_id || ""))}', ${Number(ord.quantite || 0)}, 'annulee')" class="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50 transition">Annuler</button>
-                    </div>
-                ` : "";
-
-                const item = document.createElement("div");
-                item.className = "p-3 border rounded-lg bg-gray-50 space-y-2";
-                item.innerHTML = `
-                    <div class="flex justify-between items-start">
-                        <div>
-                            <p class="font-bold text-gray-800">Client : ${escapeHtml(ord.telephone_client || "")}</p>
-                            <p class="text-xs text-gray-600">Produit : <span class="font-medium">${escapeHtml(ord.produits?.nom || "Article")}</span> (x${Number(ord.quantite || 0)})</p>
-                            <p class="text-xs text-gray-500">Lieu : ${escapeHtml(ord.lieu_livraison || "")}</p>
-                        </div>
-                        <div>${statusBadge}</div>
-                    </div>
-                    ${actionsHtml}
-                `;
-                ordersList.appendChild(item);
-            });
+            cachedOrders = orders || [];
+            renderOrdersList();
         } catch (err) {
+            cachedOrders = [];
+            ensureOrderFilterBar();
             ordersList.innerHTML = `<p class="text-gray-500 italic">Module commandes en attente de configuration.</p>`;
         }
     }
@@ -512,7 +576,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!confirm(`Voulez-vous vraiment marquer cette commande comme "${labelStatus}" ?`)) return;
 
         processingOrderIds.add(orderKey);
-        loadVendorOrders();
+        renderOrdersList();
 
         try {
             // 1. Vérifier que la commande est toujours en attente avant de la traiter
