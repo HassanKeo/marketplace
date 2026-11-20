@@ -34,7 +34,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const productsList = document.getElementById("products-list");
     const ordersList = document.getElementById("orders-list");
 
-    let isLoginMode = true;
+let isLoginMode = true;
+    let currentOrderFilter = "all"; // "all" | "en_attente" | "validee" | "annulee"
+    let cachedOrders = [];
     const productsCache = new Map();
     const processingOrderIds = new Set();
 
