@@ -440,7 +440,7 @@ document.addEventListener("DOMContentLoaded", () => {
             orders.forEach(ord => {
                 const status = ord.statut || 'en_attente';
                 let statusBadge = '<span class="px-2 py-0.5 text-xs rounded bg-yellow-100 text-yellow-800 font-semibold">En attente</span>';
-                if (status === 'confirmee') statusBadge = '<span class="px-2 py-0.5 text-xs rounded bg-green-100 text-green-800 font-semibold">Confirmée</span>';
+                if (status === 'validee') statusBadge = '<span class="px-2 py-0.5 text-xs rounded bg-green-100 text-green-800 font-semibold">Validée</span>';
                 if (status === 'annulee') statusBadge = '<span class="px-2 py-0.5 text-xs rounded bg-red-100 text-red-800 font-semibold">Annulée</span>';
 
                 const item = document.createElement("div");
@@ -455,7 +455,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         <div>${statusBadge}</div>
                     </div>
                     <div class="flex justify-end space-x-2 pt-2 border-t text-xs">
-                        <button onclick="window.handleOrderAction('${ord.id}', '${ord.produit_id}', ${ord.quantite}, 'confirmee')" class="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 transition">Valider</button>
+                        <button onclick="window.handleOrderAction('${ord.id}', '${ord.produit_id}', ${ord.quantite}, 'validee')" class="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 transition">Valider</button>
                         <button onclick="window.handleOrderAction('${ord.id}', '${ord.produit_id}', ${ord.quantite}, 'annulee')" class="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 transition">Annuler</button>
                     </div>
                 `;
@@ -468,11 +468,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Valider ou annuler une commande et mettre à jour le stock automatiquement
     window.handleOrderAction = async function(orderId, produitId, orderedQty, newStatus) {
-        const labelStatus = newStatus === 'confirmee' ? 'confirmée' : 'annulée';
+        const labelStatus = newStatus === 'validee' ? 'validée' : 'annulée';
         if (!confirm(`Voulez-vous vraiment marquer cette commande comme "${labelStatus}" ?`)) return;
 
         try {
-            // 1. Mettre à jour le statut de la commande (sans accent)
+            // 1. Mettre à jour le statut de la commande
             const { error: updateError } = await db
                 .from("commandes")
                 .update({ statut: newStatus })
@@ -480,8 +480,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
             if (updateError) throw updateError;
 
-            // 2. Si la commande est confirmée, on décrémente le stock du produit correspondant
-            if (newStatus === 'confirmee' && produitId) {
+            // 2. Si la commande est validée, on décrémente le stock du produit correspondant
+            if (newStatus === 'validee' && produitId) {
                 const { data: prodData, error: prodError } = await db
                     .from("produits")
                     .select("stock")
