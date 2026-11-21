@@ -20,8 +20,28 @@ document.addEventListener("DOMContentLoaded", async () => {
     const modalOrderError = document.getElementById("modal-order-error");
     const modalSubmitBtn = document.getElementById("modal-submit-btn");
 
+    const DEFAULT_SUBMIT_HTML = modalSubmitBtn ? modalSubmitBtn.innerHTML : "Commander via WhatsApp";
+
     let currentVendorWhatsapp = "";
     let productsCache = {};
+
+    function renderLoadingState(message = "Chargement du catalogue...") {
+        if (!productsGrid) return;
+        productsGrid.innerHTML = `
+            <div class="col-span-full flex flex-col items-center justify-center py-14 space-y-3 text-gray-500">
+                <span class="w-7 h-7 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></span>
+                <p class="text-xs font-medium">${message}</p>
+            </div>
+        `;
+    }
+
+    function setSubmitLoading(isLoading) {
+        if (!modalSubmitBtn) return;
+        modalSubmitBtn.disabled = isLoading;
+        modalSubmitBtn.innerHTML = isLoading
+            ? `<span class="inline-flex items-center justify-center gap-2"><span class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span><span>Envoi...</span></span>`
+            : DEFAULT_SUBMIT_HTML;
+    }
 
     function showModalError(message) {
         if (!modalOrderError) {
@@ -51,6 +71,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     await loadStoreData(vendorId);
 
     async function loadStoreData(vId) {
+        renderLoadingState("Chargement des produits...");
+
         try {
             const { data: vendor, error: vendorError } = await db
                 .from("vendeurs")
@@ -136,6 +158,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (!prod) return;
 
         clearModalError();
+        setSubmitLoading(false);
         const stock = prod.stock !== undefined && prod.stock !== null ? Number(prod.stock) : 0;
 
         if (stock <= 0) {
@@ -179,6 +202,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (closeModalBtn && orderModal) {
         closeModalBtn.addEventListener("click", () => {
             clearModalError();
+            setSubmitLoading(false);
             orderModal.classList.add("hidden");
         });
     }
@@ -214,7 +238,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 return;
             }
 
-            if (modalSubmitBtn) modalSubmitBtn.disabled = true;
+            setSubmitLoading(true);
 
             try {
                 // Vérification fraîche du stock avant insertion
@@ -269,7 +293,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 console.error(err);
                 showModalError("Erreur lors de l'enregistrement de la commande : " + (err.message || "Problème réseau."));
             } finally {
-                if (modalSubmitBtn) modalSubmitBtn.disabled = false;
+                setSubmitLoading(false);
             }
         });
     }
