@@ -14,11 +14,29 @@ document.addEventListener("DOMContentLoaded", async () => {
     const modalProductId = document.getElementById("modal-product-id");
     const modalVendorId = document.getElementById("modal-vendor-id");
     const modalQty = document.getElementById("modal-qty");
+    const modalStockInfo = document.getElementById("modal-stock-info");
     const modalPhone = document.getElementById("modal-phone");
     const modalLocation = document.getElementById("modal-location");
+    const modalOrderError = document.getElementById("modal-order-error");
+    const modalSubmitBtn = document.getElementById("modal-submit-btn");
 
     let currentVendorWhatsapp = "";
     let productsCache = {};
+
+    function showModalError(message) {
+        if (!modalOrderError) {
+            alert(message);
+            return;
+        }
+        modalOrderError.textContent = message;
+        modalOrderError.classList.remove("hidden");
+    }
+
+    function clearModalError() {
+        if (!modalOrderError) return;
+        modalOrderError.textContent = "";
+        modalOrderError.classList.add("hidden");
+    }
 
     const urlParams = new URLSearchParams(window.location.search);
     const vendorId = urlParams.get("v");
@@ -68,11 +86,12 @@ document.addEventListener("DOMContentLoaded", async () => {
             productsCache = {};
 
             products.forEach(prod => {
-                productsCache[prod.id] = prod;
-                const isOutOfStock = (prod.stock !== undefined && prod.stock <= 0);
+                productsCache[String(prod.id)] = prod;
+                const stock = prod.stock !== undefined && prod.stock !== null ? Number(prod.stock) : 0;
+                const isOutOfStock = stock <= 0;
                 const card = document.createElement("div");
                 card.className = `bg-white border rounded-xl overflow-hidden shadow-sm flex flex-col justify-between transition ${isOutOfStock ? 'opacity-60 border-red-200' : 'hover:shadow-md'}`;
-                
+
                 card.innerHTML = `
                     <div>
                         <div class="h-48 w-full bg-gray-100 relative overflow-hidden">
@@ -81,17 +100,20 @@ document.addEventListener("DOMContentLoaded", async () => {
                         </div>
                         <div class="p-4 space-y-2">
                             <h3 class="font-bold text-gray-800 text-base">${prod.nom}</h3>
-                            <p class="text-blue-600 font-bold text-sm">${prod.prix.toLocaleString()} FCFA</p>
-                            
+                            <p class="text-blue-600 font-bold text-sm">${Number(prod.prix || 0).toLocaleString()} FCFA</p>
+                            <p class="text-xs font-medium ${isOutOfStock ? 'text-red-600' : 'text-gray-500'}">
+                                ${isOutOfStock ? 'Rupture de stock' : `En stock : ${stock}`}
+                            </p>
+
                             <!-- Accordéon déroulant sur la carte -->
                             <details class="text-xs text-gray-600 bg-gray-50 p-2 rounded-lg border">
-                                <summary class="font-medium text-gray-700 cursor-pointer select-none">Des questions? lisez la description du produit</summary>
+                                <summary class="font-medium text-gray-700 cursor-pointer select-none">Des questions ? Lisez la description du produit</summary>
                                 <p class="mt-2 pt-2 border-t text-gray-600 whitespace-pre-line">${prod.description || 'Aucune description détaillée fournie.'}</p>
                             </details>
                         </div>
                     </div>
                     <div class="p-4 pt-2">
-                        <button onclick="window.openOrderModal('${prod.id}', '${vId}')" 
+                        <button onclick="window.openOrderModal('${prod.id}', '${vId}')"
                             class="w-full py-2 rounded-lg text-xs font-semibold transition ${isOutOfStock ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-green-600 text-white hover:bg-green-700'}"
                             ${isOutOfStock ? 'disabled' : ''}>
                             ${isOutOfStock ? 'Rupture de stock' : 'Commander'}
@@ -110,30 +132,53 @@ document.addEventListener("DOMContentLoaded", async () => {
     // --- GESTION DU MODAL DE COMMANDE ---
 
     window.openOrderModal = function(productId, vId) {
-        const prod = productsCache[productId];
+        const prod = productsCache[String(productId)];
         if (!prod) return;
 
-        const stock = prod.stock || 0;
+        clearModalError();
+        const stock = prod.stock !== undefined && prod.stock !== null ? Number(prod.stock) : 0;
+
         if (stock <= 0) {
-            alert("Désolé, ce produit est en rupture de stock.");
+            if (modalProductTitle) modalProductTitle.textContent = prod.nom;
+            if (modalStockInfo) {
+                modalStockInfo.textContent = "Produit épuisé (stock : 0).";
+                modalStockInfo.className = "text-xs text-red-600 font-medium mt-1";
+            }
+            if (modalQty) {
+                modalQty.value = 0;
+                modalQty.max = 0;
+                modalQty.disabled = true;
+            }
+            if (modalSubmitBtn) modalSubmitBtn.disabled = true;
+            showModalError("Ce produit est en rupture de stock et ne peut pas être commandé.");
+            if (orderModal) orderModal.classList.remove("hidden");
             return;
+        }
+
+        if (modalQty) {
+            modalQty.disabled = false;
+            modalQty.min = 1;
+            modalQty.max = stock;
+            modalQty.value = 1;
+        }
+        if (modalSubmitBtn) modalSubmitBtn.disabled = false;
+        if (modalStockInfo) {
+            modalStockInfo.textContent = `Disponible en stock : ${stock}`;
+            modalStockInfo.className = "text-xs text-gray-500 mt-1";
         }
 
         if (modalProductTitle) modalProductTitle.textContent = `Commander : ${prod.nom}`;
         if (modalProductDesc) modalProductDesc.textContent = prod.description || "Aucune description détaillée fournie.";
         if (modalDescDetails) modalDescDetails.removeAttribute("open");
-        
+
         if (modalProductId) modalProductId.value = productId;
         if (modalVendorId) modalVendorId.value = vId;
-        if (modalQty) {
-            modalQty.value = 1;
-            modalQty.max = stock;
-        }
         if (orderModal) orderModal.classList.remove("hidden");
     };
 
     if (closeModalBtn && orderModal) {
         closeModalBtn.addEventListener("click", () => {
+            clearModalError();
             orderModal.classList.add("hidden");
         });
     }
@@ -141,19 +186,60 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (orderForm) {
         orderForm.addEventListener("submit", async (e) => {
             e.preventDefault();
+            clearModalError();
 
             const pId = modalProductId.value;
             const vId = modalVendorId.value;
-            const qty = parseInt(modalQty.value);
+            const qty = parseInt(modalQty.value, 10);
             const phone = modalPhone.value.trim();
             const location = modalLocation.value.trim();
 
             if (!phone || !location || isNaN(qty) || qty < 1) {
-                alert("Veuillez remplir tous les champs correctement.");
+                showModalError("Veuillez remplir tous les champs correctement.");
                 return;
             }
 
+            const cachedProd = productsCache[String(pId)];
+            const cachedStock = cachedProd && cachedProd.stock !== undefined && cachedProd.stock !== null
+                ? Number(cachedProd.stock)
+                : 0;
+
+            if (cachedStock <= 0) {
+                showModalError("Ce produit est en rupture de stock.");
+                return;
+            }
+
+            if (qty > cachedStock) {
+                showModalError(`Stock insuffisant : maximum ${cachedStock} disponible(s).`);
+                return;
+            }
+
+            if (modalSubmitBtn) modalSubmitBtn.disabled = true;
+
             try {
+                // Vérification fraîche du stock avant insertion
+                const { data: freshProd, error: stockErr } = await db
+                    .from("produits")
+                    .select("stock")
+                    .eq("id", pId)
+                    .maybeSingle();
+
+                if (stockErr) throw stockErr;
+
+                const latestStock = freshProd && freshProd.stock !== undefined && freshProd.stock !== null
+                    ? Number(freshProd.stock)
+                    : 0;
+
+                if (latestStock <= 0) {
+                    showModalError("Ce produit vient d'être épuisé.");
+                    return;
+                }
+
+                if (qty > latestStock) {
+                    showModalError(`Stock insuffisant : seulement ${latestStock} restant(s).`);
+                    return;
+                }
+
                 const { error: insertError } = await db.from("commandes").insert([
                     {
                         vendor_id: vId,
@@ -161,7 +247,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                         quantite: qty,
                         telephone_client: phone,
                         lieu_livraison: location,
-                        statut: 'en_attente'
+                        statut: "en_attente"
                     }
                 ]);
 
@@ -174,13 +260,16 @@ document.addEventListener("DOMContentLoaded", async () => {
 
                 orderModal.classList.add("hidden");
                 orderForm.reset();
+                clearModalError();
 
                 const cleanWhatsappNumber = currentVendorWhatsapp.replace(/[^0-9+]/g, "");
                 window.open(`https://wa.me/${cleanWhatsappNumber}?text=${whatsappMessage}`, "_blank");
 
             } catch (err) {
                 console.error(err);
-                alert("Erreur lors de l'enregistrement de la commande : " + (err.message || "Problème réseau."));
+                showModalError("Erreur lors de l'enregistrement de la commande : " + (err.message || "Problème réseau."));
+            } finally {
+                if (modalSubmitBtn) modalSubmitBtn.disabled = false;
             }
         });
     }
